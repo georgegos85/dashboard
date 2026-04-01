@@ -598,7 +598,7 @@
                 
                 const maxAvailMonth = yearData.length > 0 ? yearData.reduce((max, d) => Math.max(max, d._month || 0), 0) : 12;
 
-                let curLabel = ''; let prevLabel = ''; let curData = []; let compData = []; let curEndAbs = 0;
+                let curLabel = ''; let prevLabel = ''; let curData = []; let compData = []; let curEndAbs = 0; let curSpan = 12;
 
                 const passesBase = (item) => {
                     if (filters.state.length > 0 && !filters.state.includes(item._state)) return false;
@@ -614,12 +614,19 @@
                     return true;
                 };
 
-                if (timeMode === 'UDM') {
+                if (timeMode === 'UDM' || timeMode === 'U6M') {
                     let endMonth = explicitMonths.length > 0 ? explicitMonths[explicitMonths.length - 1] : maxAvailMonth;
                     if (endMonth > maxAvailMonth) endMonth = maxAvailMonth;
+                    
+                    const span = timeMode === 'U6M' ? 6 : 12;
+                    curSpan = span;
                     curEndAbs = refYear * 12 + endMonth;
-                    const curStartAbs = curEndAbs - 11; const prevEndAbs = curEndAbs - 12; const prevStartAbs = prevEndAbs - 11;
+                    const curStartAbs = curEndAbs - (span - 1);
+                    const prevEndAbs = curEndAbs - span;
+                    const prevStartAbs = prevEndAbs - (span - 1);
+                    
                     const formatPeriod = (startAbs, endAbs) => `${MONTH_NAMES[((startAbs - 1) % 12)]}/${Math.floor((startAbs - 1) / 12).toString().slice(-2)} a ${MONTH_NAMES[((endAbs - 1) % 12)]}/${Math.floor((endAbs - 1) / 12).toString().slice(-2)}`;
+                    
                     curLabel = formatPeriod(curStartAbs, curEndAbs); prevLabel = formatPeriod(prevStartAbs, prevEndAbs);
                     curData = data.filter(d => { if (!passesBase(d)) return false; const abs = d._year * 12 + d._month; return abs >= curStartAbs && abs <= curEndAbs; });
                     compData = data.filter(d => { if (!passesBase(d)) return false; const abs = d._year * 12 + d._month; return abs >= prevStartAbs && abs <= prevEndAbs; });
@@ -630,6 +637,8 @@
                     const refYearsArr = filters.years.length > 0 ? filters.years.map(Number).sort((a,b)=>a-b) : [availYears[0]];
                     const activeYearsStr = refYearsArr.length > 2 ? `${refYearsArr.length} anos` : refYearsArr.map(y => y.toString().slice(-2)).join('/');
                     const compYearsStr = refYearsArr.length > 2 ? `Anterior` : refYearsArr.map(y => (y - 1).toString().slice(-2)).join('/');
+
+                    curSpan = (explicitMonths.length > 0 ? explicitMonths.length : maxAvailMonth) * refYearsArr.length;
 
                     if (explicitMonths.length > 0) {
                          curLabel = `Meses Sel. (${activeYearsStr})`;
@@ -659,12 +668,12 @@
                         return passesBase(d);
                     });
                 }
-                return { curLabel, prevLabel, dataCur: curData, dataComp: compData, curEndAbs };
+                return { curLabel, prevLabel, dataCur: curData, dataComp: compData, curEndAbs, curSpan };
             }, [data, filters, timeMode]);
 
             const metrics = useMemo(() => {
                 if (!yearComparison || !yearComparison.dataCur) return { fatCur: 0, fatComp: 0, capCur: 0, capComp: 0, novosMain: 0, perdidosMain: 0, alertaMain: 0, precoMedioCur: 0, precoMedioGrowth: null, alertaDetails: [], novosDetails: [], perdidosDetails: [], top20Details: [], allClientsRanked: [] };
-                const { dataCur, dataComp, curEndAbs } = yearComparison;
+                const { dataCur, dataComp, curEndAbs, curSpan } = yearComparison;
                 let fatCurTotal = 0; let fatCompTotal = 0; let qtyCurTotal = 0; let qtyCompTotal = 0;
                 const cliMap = new Map();
                 
@@ -699,7 +708,7 @@
                     if (isCur) capCur++; if (isComp) capComp++; if (isCur) allClients.push(val);
                     if (isCur && !isComp) { fatNovosMain += val.fatCur; novosDetails.push(val); }
                     if (!isCur && isComp) { fatPerdidosMain += val.fatComp; perdidosDetails.push(val); }
-                    if (isCur) { const delay = curEndAbs - val.maxDateAbs; if (delay > 2 && delay < 12) { alertaDetails.push({ ...val, atraso: delay, mediaMensal: val.fatCur / 12, mslp: delay, mesesCarencia: 2 }); alertaMain++; } }
+                    if (isCur) { const delay = curEndAbs - val.maxDateAbs; if (delay > 2 && delay < 12) { alertaDetails.push({ ...val, atraso: delay, mediaMensal: val.fatCur / (curSpan || 12), mslp: delay, mesesCarencia: 2 }); alertaMain++; } }
                 });
                 
                 const allClientsRanked = [...allClients].sort((a,b) => b.fatCur - a.fatCur); allClientsRanked.forEach((c, index) => c.rank = index + 1);
@@ -1347,8 +1356,8 @@
                                                 </div>
                                                 <div className="bg-white p-3 rounded-lg border border-slate-200">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Média Mensal</p>
-                                                    <h3 className="text-base font-black text-slate-800 mt-0.5">{modalEvolucaoMode === 'faturamento' ? formatCurrency(clienteDetails.curTotal / 12) : `${Math.round(clienteDetails.curQtyTotal / 12).toLocaleString('pt-BR')} un`}</h3>
-                                                    <p className="text-[8px] text-slate-400 font-bold mt-1">/ 12 meses</p>
+                                                    <h3 className="text-base font-black text-slate-800 mt-0.5">{modalEvolucaoMode === 'faturamento' ? formatCurrency(clienteDetails.curTotal / (yearComparison?.curSpan || 12)) : `${Math.round(clienteDetails.curQtyTotal / (yearComparison?.curSpan || 12)).toLocaleString('pt-BR')} un`}</h3>
+                                                    <p className="text-[8px] text-slate-400 font-bold mt-1">/ {yearComparison?.curSpan || 12} meses</p>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mb-4">
@@ -1500,6 +1509,7 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200">
+                                <button onClick={() => setTimeMode('U6M')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded transition-all ${timeMode === 'U6M' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}>U6M (6 Meses)</button>
                                 <button onClick={() => setTimeMode('UDM')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded transition-all ${timeMode === 'UDM' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}>UDM (12 Meses)</button>
                                 <button onClick={() => setTimeMode('YTD')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded transition-all ${timeMode === 'YTD' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}>YTD (Acumulado)</button>
                             </div>
