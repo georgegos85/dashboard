@@ -596,7 +596,6 @@
                 const explicitMonths = filters.months.length > 0 ? filters.months.map(Number).sort((a,b)=>a-b) : [];
                 const yearData = data.filter(d => d._year === refYear && d._month > 0);
                 
-                // CORREÇÃO DE MEMÓRIA: .reduce em vez de ...spread
                 const maxAvailMonth = yearData.length > 0 ? yearData.reduce((max, d) => Math.max(max, d._month || 0), 0) : 12;
 
                 let curLabel = ''; let prevLabel = ''; let curData = []; let compData = []; let curEndAbs = 0;
@@ -714,7 +713,6 @@
             const evolucaoChartState = useMemo(() => {
                 if (!data.length) return { data: MONTH_NAMES.map(m => ({name: m})), lines: [] };
                 
-                // CORREÇÃO DE MEMÓRIA: .reduce em vez de ...spread
                 const maxYearFallback = data.reduce((max, d) => Math.max(max, d._year || 0), 0) || new Date().getFullYear();
                 let userSelectedYears = filters.years.length > 0 ? filters.years.map(Number) : [maxYearFallback];
                 
@@ -933,7 +931,7 @@
                 );
             }
 
-            if (!isLoaded) {
+            if (!isLoaded || showUploadScreen) {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
                         <div className="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-md w-full border border-slate-100">
@@ -944,18 +942,32 @@
                                 </div>
                             )}
                             
-                            <h2 className="text-xl font-black text-slate-800 mb-2">Login no Dashboard</h2>
-                            <p className="text-slate-500 text-xs mb-6">Introduza a sua credencial para aceder à performance comercial da sua região.</p>
-                            <input type="password" placeholder="Senha de acesso..." value={passwordValue} onChange={e => setPasswordValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && verifyPassword()} autoFocus className={`w-full px-4 py-2.5 rounded-xl border text-center font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-3 text-sm ${passwordError ? 'border-rose-500' : 'border-slate-200'}`} />
-                            <button onClick={verifyPassword} className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl hover:bg-blue-700 transition-all text-sm mb-4">Entrar</button>
-                            
-                            <div className="mt-4 pt-4 border-t border-slate-100">
-                                <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Ou faça upload manual do CSV</p>
-                                <label className="block w-full cursor-pointer bg-slate-100 text-slate-600 font-bold py-2 rounded-xl text-xs hover:bg-slate-200 transition-colors">
-                                    Selecionar Arquivo CSV Local
-                                    <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-                                </label>
-                            </div>
+                            {!isAdminVerified ? (
+                                <>
+                                    <h2 className="text-xl font-black text-slate-800 mb-2">Login no Dashboard</h2>
+                                    <p className="text-slate-500 text-xs mb-6">Introduza a sua credencial para aceder à performance comercial da sua região.</p>
+                                    <input type="password" placeholder="Senha de acesso..." value={passwordValue} onChange={e => setPasswordValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && verifyPassword()} autoFocus className={`w-full px-4 py-2.5 rounded-xl border text-center font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-3 text-sm ${passwordError ? 'border-rose-500' : 'border-slate-200'}`} />
+                                    <button onClick={verifyPassword} className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl hover:bg-blue-700 transition-all text-sm mb-4">Entrar</button>
+                                </>
+                            ) : (
+                                <>
+                                    <h2 className="text-xl font-black text-slate-800 mb-2">Olá, {currentUser?.nome.split(' ')[0]}!</h2>
+                                    <p className="text-slate-500 text-xs mb-6">Acesso autorizado. Carregue o CSV oficial com as vendas para visualizar a performance da sua região.</p>
+                                    
+                                    <div className="mt-4 pt-4 border-t border-slate-100">
+                                        <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Selecione o ficheiro de vendas</p>
+                                        <label className="block w-full cursor-pointer bg-slate-900 text-white font-bold py-3 rounded-xl text-sm hover:bg-black transition-colors">
+                                            Selecionar Arquivo CSV
+                                            <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+                                        </label>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-center gap-4 mt-6">
+                                        {isLoaded && <button onClick={() => setShowUploadScreen(false)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors">Cancelar e Voltar</button>}
+                                        <button onClick={() => { setIsAdminVerified(false); setCurrentUser(null); setPasswordValue(''); setErrorMsg(null); }} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors flex items-center gap-1"><Icon name="UserMinus" size={12}/> Sair da Conta</button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 );
@@ -1411,15 +1423,9 @@
                                                         <td className="py-2 px-4 text-[10px] truncate max-w-[200px]" title={p.name}>{p.name}</td>
                                                         <td className="py-2 px-4 text-[10px] text-right text-slate-800">{Number(p.qty || 0).toLocaleString('pt-BR')} un</td>
                                                         {modalConfig.type === 'preco' && <td className="py-2 px-4 text-[10px] text-right text-slate-800">{formatCurrency(p.amount)}</td>}
-                                                        <td className="py-2 px-4 text-right">
-                                                            <div className="text-emerald-500 text-[10px] font-black">R$ {Number(p.min || 0).toFixed(2)}</div>
-                                                            {p.minDate && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.minDate}</div>}
-                                                        </td>
+                                                        <td className="py-2 px-4 text-right"><div className="text-emerald-500 text-[10px] font-black">R$ {Number(p.min || 0).toFixed(2)}</div>{p.minDate && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.minDate}</div>}</td>
                                                         <td className="py-2 px-4 text-[10px] text-right text-blue-700 bg-blue-50/30">R$ {Number(p.avg || 0).toFixed(2)}</td>
-                                                        <td className="py-2 px-4 text-right">
-                                                            <div className="text-slate-800 text-[10px] font-black">R$ {Number(p.lastPrice || 0).toFixed(2)}</div>
-                                                            {p.lastDateLabel && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.lastDateLabel}</div>}
-                                                        </td>
+                                                        <td className="py-2 px-4 text-right"><div className="text-slate-800 text-[10px] font-black">R$ {Number(p.lastPrice || 0).toFixed(2)}</div>{p.lastDateLabel && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.lastDateLabel}</div>}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1533,7 +1539,7 @@
                                 <div className="flex flex-col gap-0.5 mt-auto"><GrowthBadge growth={metrics.capGrowth} curLabel={yearComparison?.curLabel} prevLabel={yearComparison?.prevLabel} timeMode={timeMode} /><div className="mt-1 flex items-center gap-1 text-[8px] font-bold w-fit px-1.5 py-0.5 rounded bg-slate-50 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 border border-slate-200">Evolução</div></div>
                             </div>
                             <div onClick={() => openModal('novos')} className="bg-emerald-50 hover:bg-emerald-100 p-3 rounded-lg border border-emerald-200 shadow-sm flex flex-col justify-between cursor-pointer group">
-                                <div><div className="flex justify-between items-start mb-0.5"><p className="text-emerald-600/70 text-[8px] font-black uppercase cursor-help border-b border-dashed border-emerald-400 w-fit" title="Sem compras no período comparativo.">Clientes Novos</p><Icon name="UserPlus" size={10} className="text-emerald-400 group-hover:text-emerald-600" /></div><h3 className="text-lg font-black text-emerald-700">{Number(metrics.novosMain || 0).toLocaleString('pt-BR')}</h3><p className="text-emerald-600 text-[8px] font-bold">{formatCurrency(metrics.fatNovosMain)}</p></div>
+                                <div><div className="flex justify-between items-start mb-0.5"><p className="text-emerald-600/70 text-[8px] font-black uppercase cursor-help border-b border-dashed border-emerald-400 w-fit" title="Sem compras no período comparativo.">Clientes Novos</p><Icon name="List" size={10} className="text-emerald-400 group-hover:text-emerald-600" /></div><h3 className="text-lg font-black text-emerald-700">{Number(metrics.novosMain || 0).toLocaleString('pt-BR')}</h3><p className="text-emerald-600 text-[8px] font-bold">{formatCurrency(metrics.fatNovosMain)}</p></div>
                                 <div className="flex flex-col gap-0.5 mt-auto"><div className="mt-1 flex items-center gap-1 text-[8px] font-bold w-fit px-1.5 py-0.5 rounded bg-emerald-200/50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">Detalhar {timeMode}</div></div>
                             </div>
                             <div onClick={() => openModal('alerta')} className="bg-amber-50 hover:bg-amber-100 p-3 rounded-lg border border-amber-200 shadow-sm flex flex-col justify-between cursor-pointer group">
