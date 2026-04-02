@@ -366,15 +366,16 @@
             
             const [modalDistributorFilter, setModalDistributorFilter] = useState(''); 
             const [modalProductFilter, setModalProductFilter] = useState(''); 
-            const [modalClientFilter, setModalClientFilter] = useState(''); 
+            const [modalClientFilter, setModalClientFilter] = useState('TODOS'); 
             const [modalAbcFilter, setModalAbcFilter] = useState('TODOS');
             const [analiticoSortConfig, setAnaliticoSortConfig] = useState({ column: 'data', direction: 'desc' });
+            const [clientSortConfig, setClientSortConfig] = useState({ column: 'fatCur', direction: 'desc' });
             const [abcDimension, setAbcDimension] = useState('clientes');
             const [modalEvolucaoMode, setModalEvolucaoMode] = useState('faturamento');
 
             const [filters, setFilters] = useState({ searchCustomer: '', searchProduct: '', years: [], months: [], state: [], distributor: [], customerType: [], type: [], product: [] });
 
-            // ---> INTEGRAÇÃO DO PAPAPARSE & CORREÇÃO DO NOME DO CLIENTE <---
+            // ---> INTEGRAÇÃO DO PAPAPARSE COM FAREJADOR DE DELIMITADOR & ROBUSTEZ DE DATAS <---
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -383,159 +384,185 @@
                 setErrorMsg(null);
                 setShowUploadScreen(false);
 
-                Papa.parse(file, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        setTimeout(() => {
-                            try {
-                                const rawData = results.data;
-                                if (!rawData || rawData.length === 0) throw new Error("O arquivo CSV está vazio ou o formato não é reconhecido.");
+                // Função auxiliar para detetar o separador do CSV de forma blindada
+                const detectDelimiter = (file, callback) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const textChunk = event.target.result;
+                        const firstLine = textChunk.split(/\r?\n/)[0];
+                        let detectedDelimiter = ',';
+                        if (firstLine) {
+                            const semiCount = (firstLine.match(/;/g) || []).length;
+                            const commaCount = (firstLine.match(/,/g) || []).length;
+                            const tabCount = (firstLine.match(/\t/g) || []).length;
+                            if (semiCount > commaCount && semiCount > tabCount) detectedDelimiter = ';';
+                            else if (tabCount > commaCount && tabCount > semiCount) detectedDelimiter = '\t';
+                        }
+                        callback(detectedDelimiter);
+                    };
+                    const blob = file.slice(0, 1024 * 64); // Lê só os primeiros 64KB para detetar
+                    reader.readAsText(blob);
+                };
 
-                                let maxDate = null; 
-                                const resultData = [];
+                detectDelimiter(file, (delimiter) => {
+                    Papa.parse(file, {
+                        delimiter: delimiter,
+                        header: true,
+                        skipEmptyLines: 'greedy',
+                        complete: (results) => {
+                            setTimeout(() => {
+                                try {
+                                    const rawData = results.data;
+                                    if (!rawData || rawData.length === 0) throw new Error("O arquivo CSV está vazio ou o formato não é reconhecido.");
 
-                                for (let i = 0; i < rawData.length; i++) {
-                                    const rawRow = rawData[i];
-                                    const obj = {};
-                                    
-                                    for (const key in rawRow) {
-                                        const cleanKey = removeAccents(key.toLowerCase().trim());
-                                        let val = rawRow[key];
-                                        if (typeof val === 'string') val = val.trim();
-                                        
-                                        const isNumericField = ['amount', 'qty', 'quantidade', 'volume', 'faturamento', 'total', 'valor', 'month', 'year', 'mes', 'ano'].includes(cleanKey);
-                                        if (isNumericField) {
-                                            if (typeof val === 'string') val = parseFloat(val.replace(/\./g, '').replace(',', '.'));
-                                            if (isNaN(val)) val = 0;
-                                        } else if (cleanKey === 'cnpj') {
-                                            val = String(val || '').replace(/\D/g, '');
-                                        } else if (['state', 'estado', 'uf'].includes(cleanKey)) {
-                                            val = String(val || '').toUpperCase();
-                                        } else if (['city', 'cidade', 'municipio'].includes(cleanKey)) {
-                                            obj._city = val;
-                                        }
-                                        
-                                        obj[key] = val;
-                                        
-                                        if (['amount', 'faturamento', 'total', 'valor'].includes(cleanKey)) obj._amount = val;
-                                        if (['qty', 'quantidade', 'volume', 'qtd', 'qtde'].includes(cleanKey)) obj._qty = val;
-                                        
-                                        // CORREÇÃO: Match exato para não confundir 'cliente' com 'tipo cliente'
-                                        if (['customer type', 'tipo cliente', 'tipo de cliente'].includes(cleanKey)) {
-                                            obj._customerType = val;
-                                        } else if (['customer', 'cliente', 'nome fantasia', 'razao social'].includes(cleanKey)) {
-                                            obj._customer = val;
-                                        }
-                                        
-                                        if (['distributor', 'distribuidor', 'parceiro', 'revenda'].includes(cleanKey)) obj._distributor = val;
-                                        if (['hq standard name', 'standard', 'produto', 'product', 'item'].includes(cleanKey)) obj._product = val;
-                                        if (['state', 'estado', 'uf'].includes(cleanKey)) obj._state = val;
-                                        if (['type', 'unidade'].includes(cleanKey)) obj._type = val;
-                                        if (['year', 'ano'].includes(cleanKey)) obj._year = val;
-                                        if (['month', 'mes'].includes(cleanKey)) obj._month = val;
-                                    }
+                                    let maxDate = null; 
+                                    const resultData = [];
 
-                                    let rawDate = obj['Date'] || obj['date'] || obj['Data'] || obj['data'] || obj['DATA'] || obj['DATE'] || '';
-                                    obj._rawDate = rawDate;
-
-                                    let timestamp = 0;
-                                    let displayDate = '';
-
-                                    if (rawDate) {
-                                        let dtStr = String(rawDate).trim().split(' ')[0];
-                                        let dt;
-                                        if (dtStr.match(/^\d{2}\/\d{2}\/\d{4}/)) {
-                                            const parts = dtStr.split('/');
-                                            obj._month = obj._month || parseInt(parts[1], 10);
-                                            obj._year = obj._year || parseInt(parts[2], 10);
-                                            dt = new Date(`${parts[2].substring(0,4)}-${parts[1]}-${parts[0]}T12:00:00Z`);
-                                            displayDate = `${parts[0]}/${parts[1]}/${parts[2].substring(0,4)}`;
-                                        } else if (dtStr.match(/^\d{4}-\d{2}-\d{2}/)) {
-                                            obj._year = obj._year || parseInt(dtStr.substring(0,4), 10);
-                                            obj._month = obj._month || parseInt(dtStr.substring(5,7), 10);
-                                            dt = new Date(`${dtStr.substring(0,4)}-${dtStr.substring(5,7)}-${dtStr.substring(8,10)}T12:00:00Z`);
-                                            displayDate = `${dtStr.substring(8,10)}/${dtStr.substring(5,7)}/${dtStr.substring(0,4)}`;
-                                        } else {
-                                            dt = new Date(dtStr);
-                                            if (!isNaN(dt)) {
-                                                obj._year = obj._year || dt.getUTCFullYear();
-                                                obj._month = obj._month || (dt.getUTCMonth() + 1);
-                                                displayDate = `${String(dt.getUTCDate()).padStart(2, '0')}/${String(dt.getUTCMonth() + 1).padStart(2, '0')}/${dt.getUTCFullYear()}`;
+                                    for (let i = 0; i < rawData.length; i++) {
+                                        const rawRow = rawData[i];
+                                        const obj = {};
+                                        let rawDate = '';
+                                        
+                                        for (const key in rawRow) {
+                                            const cleanKey = removeAccents(key.toLowerCase().trim());
+                                            let val = rawRow[key];
+                                            if (typeof val === 'string') val = val.trim();
+                                            
+                                            const isNumericField = ['amount', 'qty', 'quantidade', 'volume', 'faturamento', 'total', 'valor', 'month', 'year', 'mes', 'ano'].includes(cleanKey);
+                                            if (isNumericField) {
+                                                if (typeof val === 'string') val = parseFloat(val.replace(/\./g, '').replace(',', '.'));
+                                                if (isNaN(val)) val = 0;
+                                            } else if (cleanKey === 'cnpj') {
+                                                val = String(val || '').replace(/\D/g, '');
+                                            } else if (['state', 'estado', 'uf'].includes(cleanKey)) {
+                                                val = String(val || '').toUpperCase();
+                                            } else if (['city', 'cidade', 'municipio'].includes(cleanKey)) {
+                                                obj._city = val;
                                             }
+                                            
+                                            obj[key] = val;
+                                            
+                                            if (['amount', 'faturamento', 'total', 'valor'].includes(cleanKey)) obj._amount = val;
+                                            if (['qty', 'quantidade', 'volume', 'qtd', 'qtde'].includes(cleanKey)) obj._qty = val;
+                                            
+                                            if (['customer type', 'tipo cliente', 'tipo de cliente'].includes(cleanKey)) {
+                                                obj._customerType = val;
+                                            } else if (['customer', 'cliente', 'nome fantasia', 'razao social'].includes(cleanKey)) {
+                                                obj._customer = val;
+                                            }
+                                            
+                                            if (['distributor', 'distribuidor', 'parceiro', 'revenda'].includes(cleanKey)) obj._distributor = val;
+                                            if (['hq standard name', 'standard', 'produto', 'product', 'item'].includes(cleanKey)) obj._product = val;
+                                            if (['state', 'estado', 'uf'].includes(cleanKey)) obj._state = val;
+                                            if (['type', 'unidade'].includes(cleanKey)) obj._type = val;
+                                            if (['year', 'ano'].includes(cleanKey)) obj._year = val;
+                                            if (['month', 'mes'].includes(cleanKey)) obj._month = val;
+                                            if (['date', 'data'].includes(cleanKey)) rawDate = String(val);
                                         }
-                                        if (dt && !isNaN(dt)) timestamp = dt.getTime();
+
+                                        // Proteção extra para garantir que a data não se perde com Maiúsculas/Minúsculas do Excel
+                                        if (!rawDate) {
+                                            rawDate = obj['Date'] || obj['date'] || obj['Data'] || obj['data'] || obj['DATA'] || obj['DATE'] || '';
+                                        }
+                                        
+                                        obj._rawDate = rawDate;
+
+                                        let timestamp = 0;
+                                        let displayDate = '';
+
+                                        if (rawDate) {
+                                            let dtStr = String(rawDate).trim().split(' ')[0];
+                                            let dt;
+                                            if (dtStr.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+                                                const parts = dtStr.split('/');
+                                                obj._month = obj._month || parseInt(parts[1], 10);
+                                                obj._year = obj._year || parseInt(parts[2], 10);
+                                                dt = new Date(`${parts[2].substring(0,4)}-${parts[1]}-${parts[0]}T12:00:00Z`);
+                                                displayDate = `${parts[0]}/${parts[1]}/${parts[2].substring(0,4)}`;
+                                            } else if (dtStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+                                                obj._year = obj._year || parseInt(dtStr.substring(0,4), 10);
+                                                obj._month = obj._month || parseInt(dtStr.substring(5,7), 10);
+                                                dt = new Date(`${dtStr.substring(0,4)}-${dtStr.substring(5,7)}-${dtStr.substring(8,10)}T12:00:00Z`);
+                                                displayDate = `${dtStr.substring(8,10)}/${dtStr.substring(5,7)}/${dtStr.substring(0,4)}`;
+                                            } else {
+                                                dt = new Date(dtStr);
+                                                if (!isNaN(dt)) {
+                                                    obj._year = obj._year || dt.getUTCFullYear();
+                                                    obj._month = obj._month || (dt.getUTCMonth() + 1);
+                                                    displayDate = `${String(dt.getUTCDate()).padStart(2, '0')}/${String(dt.getUTCMonth() + 1).padStart(2, '0')}/${dt.getUTCFullYear()}`;
+                                                }
+                                            }
+                                            if (dt && !isNaN(dt)) timestamp = dt.getTime();
+                                        }
+                                        
+                                        if (!timestamp && obj._year && obj._month) {
+                                            const dt = new Date(`${obj._year}-${String(obj._month).padStart(2, '0')}-01T12:00:00Z`);
+                                            timestamp = dt.getTime();
+                                            displayDate = `01/${String(obj._month).padStart(2, '0')}/${obj._year}`;
+                                        }
+
+                                        obj._timestamp = timestamp;
+                                        obj._displayDate = displayDate || 'N/I';
+                                        obj._amount = Number(obj._amount) || 0;
+                                        obj._qty = Number(obj._qty) || 0;
+                                        obj._customer = obj._customer || 'Não Informado';
+                                        obj._distributor = obj._distributor || 'Não Informado';
+                                        obj._product = obj._product || 'Não Informado';
+                                        obj._state = obj._state || 'N/I';
+                                        obj._city = obj._city || 'N/I';
+                                        obj._year = parseInt(obj._year) || 0;
+                                        obj._month = parseInt(obj._month) || 0;
+                                        obj._type = obj._type || 'N/I';
+                                        obj._customerType = obj._customerType || 'N/I';
+                                        obj.cnpj = obj.cnpj || '';
+
+                                        // Filtro de Segurança por Região
+                                        if (currentUser && currentUser.role !== 'admin') { 
+                                            if (!currentUser.estados.includes(obj._state)) continue; 
+                                        }
+
+                                        resultData.push(obj);
+
+                                        if (obj._timestamp) {
+                                            const dateTracker = new Date(obj._timestamp);
+                                            if (!isNaN(dateTracker) && (!maxDate || dateTracker > maxDate)) maxDate = dateTracker;
+                                        }
+                                    }
+
+                                    if (resultData.length === 0) { 
+                                        throw new Error(`Não existem dados registados para a sua região.`); 
                                     }
                                     
-                                    if (!timestamp && obj._year && obj._month) {
-                                        const dt = new Date(`${obj._year}-${String(obj._month).padStart(2, '0')}-01T12:00:00Z`);
-                                        timestamp = dt.getTime();
-                                        displayDate = `01/${String(obj._month).padStart(2, '0')}/${obj._year}`;
+                                    setData(resultData); 
+                                    setIsLoaded(true);
+
+                                    // Filtro Automático de WISP
+                                    const wispTypes = [...new Set(resultData.map(d => d._customerType))].filter(c => typeof c === 'string' && c.toUpperCase().includes('WISP'));
+                                    setFilters(prevFilters => ({ ...prevFilters, customerType: wispTypes }));
+                                    
+                                    if (maxDate) {
+                                        const day = String(maxDate.getUTCDate()).padStart(2, '0');
+                                        const month = String(maxDate.getUTCMonth() + 1).padStart(2, '0');
+                                        setLastUpdate(`${day}/${month}/${maxDate.getUTCFullYear()}`);
+                                    } else {
+                                        setLastUpdate("Sincronizado");
                                     }
 
-                                    obj._timestamp = timestamp;
-                                    obj._displayDate = displayDate || 'N/I';
-                                    obj._amount = Number(obj._amount) || 0;
-                                    obj._qty = Number(obj._qty) || 0;
-                                    obj._customer = obj._customer || 'Não Informado';
-                                    obj._distributor = obj._distributor || 'Não Informado';
-                                    obj._product = obj._product || 'Não Informado';
-                                    obj._state = obj._state || 'N/I';
-                                    obj._city = obj._city || 'N/I';
-                                    obj._year = parseInt(obj._year) || 0;
-                                    obj._month = parseInt(obj._month) || 0;
-                                    obj._type = obj._type || 'N/I';
-                                    obj._customerType = obj._customerType || 'N/I';
-                                    obj.cnpj = obj.cnpj || '';
-
-                                    // Filtro de Segurança por Região
-                                    if (currentUser && currentUser.role !== 'admin') { 
-                                        if (!currentUser.estados.includes(obj._state)) continue; 
-                                    }
-
-                                    resultData.push(obj);
-
-                                    if (obj._year && obj._month) {
-                                        const dateTracker = new Date(`${obj._year}-${String(obj._month).padStart(2, '0')}-01T12:00:00Z`);
-                                        if (!isNaN(dateTracker) && (!maxDate || dateTracker > maxDate)) maxDate = dateTracker;
-                                    }
+                                } catch(err) {
+                                    setErrorMsg("Erro de processamento: " + err.message);
+                                    setShowUploadScreen(true);
+                                } finally {
+                                    setIsLoadingAuto(false);
                                 }
-
-                                if (resultData.length === 0) { 
-                                    throw new Error(`Não existem dados registados para a sua região.`); 
-                                }
-                                
-                                setData(resultData); 
-                                setIsLoaded(true);
-
-                                // Filtro Automático de WISP
-                                const wispTypes = [...new Set(resultData.map(d => d._customerType))].filter(c => typeof c === 'string' && c.toUpperCase().includes('WISP'));
-                                setFilters(prevFilters => ({ ...prevFilters, customerType: wispTypes }));
-                                
-                                if (maxDate) {
-                                    const day = String(maxDate.getUTCDate()).padStart(2, '0');
-                                    const month = String(maxDate.getUTCMonth() + 1).padStart(2, '0');
-                                    setLastUpdate(`${day}/${month}/${maxDate.getUTCFullYear()}`);
-                                } else {
-                                    setLastUpdate("Sincronizado");
-                                }
-
-                            } catch(err) {
-                                setErrorMsg("Erro de processamento: " + err.message);
-                                setShowUploadScreen(true);
-                            } finally {
-                                setIsLoadingAuto(false);
-                            }
-                        }, 50);
-                    },
-                    error: (err) => {
-                        setErrorMsg("Erro ao ler o arquivo: " + err.message);
-                        setIsLoadingAuto(false);
-                        setShowUploadScreen(true);
-                    }
+                            }, 50);
+                        },
+                        error: (err) => {
+                            setErrorMsg("Erro ao ler o arquivo: " + err.message);
+                            setIsLoadingAuto(false);
+                            setShowUploadScreen(true);
+                        }
+                    });
                 });
-
-                if (e.target) e.target.value = null;
             };
 
             const verifyPassword = () => {
@@ -704,6 +731,10 @@
 
                 cliMap.forEach((val) => {
                     const isCur = val.fatCur > 0; const isComp = val.fatComp > 0;
+                    
+                    val.growth = val.fatComp > 0 ? ((val.fatCur - val.fatComp) / val.fatComp) * 100 : null;
+                    val.growthQty = val.qtyComp > 0 ? ((val.qtyCur - val.qtyComp) / val.qtyComp) * 100 : null;
+
                     if (isCur) { val.top3Dists = Array.from(val.distributors.entries()).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]); val.top3Prods = Array.from(val.products.entries()).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]); } else { val.top3Dists = []; val.top3Prods = []; }
                     if (isCur) capCur++; if (isComp) capComp++; if (isCur) allClients.push(val);
                     if (isCur && !isComp) { fatNovosMain += val.fatCur; novosDetails.push(val); }
@@ -915,6 +946,32 @@
             }, [abcData]);
 
             const filteredAbcListForTable = useMemo(() => { if (!abcData) return []; if (modalAbcFilter && modalAbcFilter !== 'TODOS') return abcData.list.filter(item => item.name === modalAbcFilter); return abcData.list; }, [abcData, modalAbcFilter]);
+
+            const sortedClientsList = useMemo(() => {
+                if (modalConfig.type !== 'top' || modalClientFilter !== 'TODOS') return [];
+                let sortable = [...(metrics.allClientsRanked || [])];
+                if (localModalSearch) {
+                    const term = removeAccents(String(localModalSearch).toLowerCase().trim());
+                    const termDigits = term.replace(/\D/g, '');
+                    sortable = sortable.filter(d => removeAccents(String(d.name || '').toLowerCase()).includes(term) || (termDigits && String(d.cnpj || '').includes(termDigits)));
+                }
+                if (modalUfFilter.length > 0) {
+                    sortable = sortable.filter(d => modalUfFilter.includes(d.state));
+                }
+
+                sortable.sort((a, b) => {
+                    let aVal = a[clientSortConfig.column];
+                    let bVal = b[clientSortConfig.column];
+                    
+                    if (aVal === null || aVal === undefined) aVal = -Infinity;
+                    if (bVal === null || bVal === undefined) bVal = -Infinity;
+
+                    if (aVal < bVal) return clientSortConfig.direction === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return clientSortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+                return sortable;
+            }, [metrics.allClientsRanked, clientSortConfig, modalConfig.type, modalClientFilter, localModalSearch, modalUfFilter]);
 
             const openModal = (type) => { setModalConfig({ isOpen: true, type }); setModalUfFilter([]); setModalYearFilter('Todos'); setLocalModalSearch(''); setModalEvolucaoMode('faturamento'); if (type === 'distribuidores') setModalDistributorFilter('TODOS'); else if (type === 'produtos') setModalProductFilter('TODOS'); else if (type === 'top') setModalClientFilter('TODOS'); else if (type === 'abc') setModalAbcFilter('TODOS'); else if (type === 'analitico') setAnaliticoSortConfig({ column: 'data', direction: 'desc' }); };
 
@@ -1397,21 +1454,59 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                                                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-wider p-2 border-b border-slate-100 bg-slate-50">Distribuidores Deste Cliente</h4>
-                                                <table className="w-full text-left">
-                                                    <thead className="bg-white"><tr className="text-[8px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100"><th className="px-3 py-2">Distribuidor</th><th className="px-3 py-2 text-right">Faturamento</th><th className="px-3 py-2 text-right">Qtd.</th><th className="px-3 py-2 text-right">Repres. (R$)</th></tr></thead>
-                                                    <tbody>
-                                                        {(modalEvolucaoMode === 'faturamento' ? clienteDetails.topDistributorsFat : clienteDetails.topDistribuidoresQty).map((c, i) => (
-                                                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80">
-                                                                <td className="px-3 py-1.5 text-[10px] font-bold text-slate-700 truncate max-w-[150px]">{c.name}</td>
-                                                                <td className="px-3 py-1.5 text-[10px] font-bold text-slate-800 text-right">{formatCurrency(c.valor)}</td>
-                                                                <td className="px-3 py-1.5 text-[10px] font-bold text-slate-600 text-right">{Number(c.qty || 0).toLocaleString('pt-BR')} un</td>
-                                                                <td className="px-3 py-1.5 text-[10px] font-bold text-emerald-600 text-right">{Number(((c.valor / clienteDetails.curTotal) * 100)||0).toFixed(1)}%</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col max-h-[400px]">
+                                                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-wider p-2 border-b border-slate-100 bg-slate-50 shrink-0">
+                                                    {modalClientFilter === 'TODOS' ? 'Ranking de Clientes (Clique na coluna para ordenar)' : 'Distribuidores Deste Cliente'}
+                                                </h4>
+                                                <div className="overflow-y-auto custom-scroll flex-1">
+                                                    <table className="w-full text-left">
+                                                        <thead className="bg-white sticky top-0 shadow-sm z-10">
+                                                            {modalClientFilter === 'TODOS' ? (
+                                                                <tr className="text-[8px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                                                                    <th className="px-3 py-2 text-center w-12">Rank</th>
+                                                                    <th className="px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setClientSortConfig(prev => ({ column: 'name', direction: prev.column === 'name' && prev.direction === 'asc' ? 'desc' : 'asc' }))}><div className={`flex items-center gap-1 ${clientSortConfig.column === 'name' ? 'text-blue-600' : ''}`}>Cliente {clientSortConfig.column === 'name' && <Icon name="ChevronDown" size={10} className={clientSortConfig.direction === 'asc' ? 'rotate-180' : ''} />}</div></th>
+                                                                    <th className="px-3 py-2 text-center">UF</th>
+                                                                    <th className="px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors text-right" onClick={() => setClientSortConfig(prev => ({ column: 'fatCur', direction: prev.column === 'fatCur' && prev.direction === 'desc' ? 'asc' : 'desc' }))}><div className={`flex items-center justify-end gap-1 ${clientSortConfig.column === 'fatCur' ? 'text-blue-600' : ''}`}>Fat. Atual {clientSortConfig.column === 'fatCur' && <Icon name="ChevronDown" size={10} className={clientSortConfig.direction === 'asc' ? 'rotate-180' : ''} />}</div></th>
+                                                                    <th className="px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors text-right" onClick={() => setClientSortConfig(prev => ({ column: 'fatComp', direction: prev.column === 'fatComp' && prev.direction === 'desc' ? 'asc' : 'desc' }))}><div className={`flex items-center justify-end gap-1 ${clientSortConfig.column === 'fatComp' ? 'text-blue-600' : ''}`}>Fat. Ant. {clientSortConfig.column === 'fatComp' && <Icon name="ChevronDown" size={10} className={clientSortConfig.direction === 'asc' ? 'rotate-180' : ''} />}</div></th>
+                                                                    <th className="px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors text-right" onClick={() => setClientSortConfig(prev => ({ column: 'growth', direction: prev.column === 'growth' && prev.direction === 'desc' ? 'asc' : 'desc' }))}><div className={`flex items-center justify-end gap-1 ${clientSortConfig.column === 'growth' ? 'text-blue-600' : ''}`}>Crescimento (%) {clientSortConfig.column === 'growth' && <Icon name="ChevronDown" size={10} className={clientSortConfig.direction === 'asc' ? 'rotate-180' : ''} />}</div></th>
+                                                                </tr>
+                                                            ) : (
+                                                                <tr className="text-[8px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100"><th className="px-3 py-2">Distribuidor</th><th className="px-3 py-2 text-right">Faturamento</th><th className="px-3 py-2 text-right">Qtd.</th><th className="px-3 py-2 text-right">Repres. (R$)</th></tr>
+                                                            )}
+                                                        </thead>
+                                                        <tbody>
+                                                            {modalClientFilter === 'TODOS' ? (
+                                                                sortedClientsList.slice(0, 500).map((c, i) => (
+                                                                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+                                                                        <td className="px-3 py-2 text-[10px] font-bold text-slate-400 text-center">#{i + 1}</td>
+                                                                        <td className="px-3 py-2 text-[10px] font-bold text-slate-700 truncate max-w-[200px]" title={c.name}>{c.name}</td>
+                                                                        <td className="px-3 py-2 text-center"><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold">{c.state}</span></td>
+                                                                        <td className="px-3 py-2 text-[10px] font-bold text-slate-800 text-right">{formatCurrency(c.fatCur)}</td>
+                                                                        <td className="px-3 py-2 text-[10px] font-bold text-slate-500 text-right">{formatCurrency(c.fatComp)}</td>
+                                                                        <td className="px-3 py-2 text-[10px] font-bold text-right">
+                                                                            {c.growth !== null ? (
+                                                                                <span className={`px-1.5 py-0.5 rounded ${c.growth > 0 ? 'bg-emerald-50 text-emerald-600' : c.growth < 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-600'}`}>
+                                                                                    {c.growth > 0 ? '+' : ''}{c.growth.toFixed(1)}%
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-slate-400">Sem Histórico</span>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))
+                                                            ) : (
+                                                                (modalEvolucaoMode === 'faturamento' ? clienteDetails.topDistributorsFat : clienteDetails.topDistribuidoresQty).map((c, i) => (
+                                                                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+                                                                        <td className="px-3 py-1.5 text-[10px] font-bold text-slate-700 truncate max-w-[150px]">{c.name}</td>
+                                                                        <td className="px-3 py-1.5 text-[10px] font-bold text-slate-800 text-right">{formatCurrency(c.valor)}</td>
+                                                                        <td className="px-3 py-1.5 text-[10px] font-bold text-slate-600 text-right">{Number(c.qty || 0).toLocaleString('pt-BR')} un</td>
+                                                                        <td className="px-3 py-1.5 text-[10px] font-bold text-emerald-600 text-right">{Number(((c.valor / clienteDetails.curTotal) * 100)||0).toFixed(1)}%</td>
+                                                                    </tr>
+                                                                ))
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
                                         </div>
                                     ) : ['preco'].includes(modalConfig.type) ? (
@@ -1432,9 +1527,15 @@
                                                         <td className="py-2 px-4 text-[10px] truncate max-w-[200px]" title={p.name}>{p.name}</td>
                                                         <td className="py-2 px-4 text-[10px] text-right text-slate-800">{Number(p.qty || 0).toLocaleString('pt-BR')} un</td>
                                                         {modalConfig.type === 'preco' && <td className="py-2 px-4 text-[10px] text-right text-slate-800">{formatCurrency(p.amount)}</td>}
-                                                        <td className="py-2 px-4 text-right"><div className="text-emerald-500 text-[10px] font-black">R$ {Number(p.min || 0).toFixed(2)}</div>{p.minDate && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.minDate}</div>}</td>
+                                                        <td className="py-2 px-4 text-right">
+                                                            <div className="text-emerald-500 text-[10px] font-black">R$ {Number(p.min || 0).toFixed(2)}</div>
+                                                            {p.minDate && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.minDate}</div>}
+                                                        </td>
                                                         <td className="py-2 px-4 text-[10px] text-right text-blue-700 bg-blue-50/30">R$ {Number(p.avg || 0).toFixed(2)}</td>
-                                                        <td className="py-2 px-4 text-right"><div className="text-slate-800 text-[10px] font-black">R$ {Number(p.lastPrice || 0).toFixed(2)}</div>{p.lastDateLabel && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.lastDateLabel}</div>}</td>
+                                                        <td className="py-2 px-4 text-right">
+                                                            <div className="text-slate-800 text-[10px] font-black">R$ {Number(p.lastPrice || 0).toFixed(2)}</div>
+                                                            {p.lastDateLabel && <div className="text-[7px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">em {p.lastDateLabel}</div>}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1549,7 +1650,7 @@
                                 <div className="flex flex-col gap-0.5 mt-auto"><GrowthBadge growth={metrics.capGrowth} curLabel={yearComparison?.curLabel} prevLabel={yearComparison?.prevLabel} timeMode={timeMode} /><div className="mt-1 flex items-center gap-1 text-[8px] font-bold w-fit px-1.5 py-0.5 rounded bg-slate-50 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 border border-slate-200">Evolução</div></div>
                             </div>
                             <div onClick={() => openModal('novos')} className="bg-emerald-50 hover:bg-emerald-100 p-3 rounded-lg border border-emerald-200 shadow-sm flex flex-col justify-between cursor-pointer group">
-                                <div><div className="flex justify-between items-start mb-0.5"><p className="text-emerald-600/70 text-[8px] font-black uppercase cursor-help border-b border-dashed border-emerald-400 w-fit" title="Sem compras no período comparativo.">Clientes Novos</p><Icon name="List" size={10} className="text-emerald-400 group-hover:text-emerald-600" /></div><h3 className="text-lg font-black text-emerald-700">{Number(metrics.novosMain || 0).toLocaleString('pt-BR')}</h3><p className="text-emerald-600 text-[8px] font-bold">{formatCurrency(metrics.fatNovosMain)}</p></div>
+                                <div><div className="flex justify-between items-start mb-0.5"><p className="text-emerald-600/70 text-[8px] font-black uppercase cursor-help border-b border-dashed border-emerald-400 w-fit" title="Sem compras no período comparativo.">Clientes Novos</p><Icon name="UserPlus" size={10} className="text-emerald-400 group-hover:text-emerald-600" /></div><h3 className="text-lg font-black text-emerald-700">{Number(metrics.novosMain || 0).toLocaleString('pt-BR')}</h3><p className="text-emerald-600 text-[8px] font-bold">{formatCurrency(metrics.fatNovosMain)}</p></div>
                                 <div className="flex flex-col gap-0.5 mt-auto"><div className="mt-1 flex items-center gap-1 text-[8px] font-bold w-fit px-1.5 py-0.5 rounded bg-emerald-200/50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">Detalhar {timeMode}</div></div>
                             </div>
                             <div onClick={() => openModal('alerta')} className="bg-amber-50 hover:bg-amber-100 p-3 rounded-lg border border-amber-200 shadow-sm flex flex-col justify-between cursor-pointer group">
