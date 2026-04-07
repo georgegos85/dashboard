@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Comercial Avançado</title>
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -14,7 +13,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #e2e8f0; } 
@@ -25,11 +23,9 @@
         .modal-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
         .modal-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .modal-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
-
         .export-mode-active { border-radius: 0 !important; box-shadow: none !important; max-height: none !important; height: auto !important; }
         .export-mode-active .modal-scroll { overflow: visible !important; max-height: none !important; }
-        .export-mode-active .no-export { display: none !important; }
-        .export-mode-active .hide-on-export { display: none !important; }
+        .export-mode-active .no-export, .export-mode-active .hide-on-export { display: none !important; }
         .export-only { display: none !important; }
         .export-mode-active .export-only { display: table-row !important; }
         .export-mode-active .truncate { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; }
@@ -42,7 +38,6 @@
         const { useState, useMemo, useEffect, useRef } = React;
         const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie, Legend, ReferenceLine, ComposedChart } = window.Recharts;
 
-        // --- Usuários ---
         const USUARIOS = [
             { nome: "Diretoria (Admin)", estados: "ALL", role: "admin", hash: "YWRtaW4uZGly" },
             { nome: "George Silva (Admin)", estados: "ALL", role: "admin", hash: "Z3NpbHZhMDAx" },
@@ -57,7 +52,6 @@
             { nome: "Juliana Passo", estados: ["SP"], role: "ev", hash: "anVsaWFuYS5wYXNzbw==" }
         ];
 
-        // --- Ícones ---
         const svgPrefix = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" `;
         const SVG_ICONS = {
             TrendingUp: `<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>`,
@@ -79,7 +73,8 @@
             Upload: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>`,
             Target: `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>`,
             Download: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`,
-            FileSpreadsheet: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h2"></path><path d="M8 17h2"></path><path d="M14 13h2"></path><path d="M14 17h2"></path>`
+            FileSpreadsheet: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h2"></path><path d="M8 17h2"></path><path d="M14 13h2"></path><path d="M14 17h2"></path>`,
+            BookOpen: `<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>`
         };
 
         const Icon = ({ name, size = 20, className = "" }) => {
@@ -88,7 +83,6 @@
             return <span className={`inline-flex items-center justify-center ${name === 'Loader2' ? 'animate-spin' : ''}`} dangerouslySetInnerHTML={{ __html: `${svgPrefix} class="${className}" width="${size}" height="${size}">${content}</svg>` }} />;
         };
 
-        // --- Wrappers de Ícones React ---
         const TrendingUp = (p) => <Icon name="TrendingUp" {...p} />;
         const TrendingDown = (p) => <Icon name="TrendingDown" {...p} />;
         const Search = (p) => <Icon name="Search" {...p} />;
@@ -109,6 +103,7 @@
         const Target = (p) => <Icon name="Target" {...p} />;
         const Download = (p) => <Icon name="Download" {...p} />;
         const FileSpreadsheet = (p) => <Icon name="FileSpreadsheet" {...p} />;
+        const BookOpen = (p) => <Icon name="BookOpen" {...p} />;
 
         const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b', '#14b8a6'];
         const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -126,22 +121,14 @@
             return <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded text-[9px] font-black shrink-0">RANK #{rank}</span>;
         };
 
-        const renderProductBarLabel = (props) => {
+        const renderBarLabel = (isFat, color) => (props) => {
             const { x, y, width, height, value } = props;
             if (value === undefined || value === null) return null;
-            return <text x={(x||0) + (width||0) + 4} y={(y||0) + (height||0) / 2 + 1} fill="#3b82f6" textAnchor="start" dominantBaseline="central" fontSize="9" fontWeight="bold">{(Number(value) || 0).toLocaleString('pt-BR')} un</text>;
-        };
-
-        const renderDistributorBarLabel = (props) => {
-            const { x, y, width, height, value } = props;
-            if (value === undefined || value === null) return null;
-            return <text x={(x||0) + (width||0) + 4} y={(y||0) + (height||0) / 2 + 1} fill="#10b981" textAnchor="start" dominantBaseline="central" fontSize="9" fontWeight="bold">{formatShortNumber(value)}</text>;
-        };
-
-        const renderClientBarLabel = (props) => {
-            const { x, y, width, height, value } = props;
-            if (value === undefined || value === null) return null;
-            return <text x={(x||0) + (width||0) + 4} y={(y||0) + (height||0) / 2 + 1} fill="#f59e0b" textAnchor="start" dominantBaseline="central" fontSize="9" fontWeight="bold">{formatShortNumber(value)}</text>;
+            return (
+                <text x={(x||0) + (width||0) + 4} y={(y||0) + (height||0) / 2 + 1} fill={color} textAnchor="start" dominantBaseline="central" fontSize="9" fontWeight="bold">
+                    {isFat ? `R$ ${formatShortNumber(value)}` : `${(Number(value) || 0).toLocaleString('pt-BR')} un`}
+                </text>
+            );
         };
 
         const DebouncedInput = ({ value, onChange, placeholder, icon }) => {
@@ -451,7 +438,7 @@
                                         obj._month = parseInt(obj._month) || 0; obj._type = obj._type || 'N/I';
                                         obj._customerType = obj._customerType || 'N/I'; obj.cnpj = obj.cnpj || '';
 
-                                        // PRÉ-INDEXAÇÃO (A "Bala de Prata" para filtros instantâneos sem congelamento)
+                                        // Pré-indexação para filtros rápidos
                                         obj._customerNorm = removeAccents(obj._customer).toLowerCase();
                                         obj._productNorm = removeAccents(obj._product).toLowerCase();
                                         obj._cityNorm = removeAccents(obj._city).toLowerCase();
@@ -561,8 +548,6 @@
                 if (refYears.length === 0) return null; const refYear = refYears[0];
                 const explicitMonths = filters.months.length > 0 ? filters.months.map(Number).sort((a,b)=>a-b) : [];
                 const yearData = data.filter(d => d._year === refYear && d._month > 0);
-                
-                // OTIMIZAÇÃO VITAL: .reduce em vez de Math.max(...) para evitar bloqueio do ecrã
                 const maxAvailMonth = yearData.length > 0 ? yearData.reduce((max, d) => Math.max(max, d._month || 0), 0) : 12;
 
                 let curLabel = ''; let prevLabel = ''; let curData = []; let compData = []; let curEndAbs = 0; let curSpan = 12;
@@ -937,6 +922,7 @@
             else if (modalConfig.type === 'distribuidores') { modalTitle = `Raio-X do Distribuidor`; modalDesc = `Tração, Capilaridade e Mix de Produtos`; iconColor = 'text-emerald-600 bg-emerald-100'; IconName = Truck; }
             else if (modalConfig.type === 'analitico') { modalTitle = `Visão Analítica (Raw Data)`; modalDesc = `Detalhamento linha a linha da sua seleção atual`; iconColor = 'text-slate-600 bg-slate-100'; IconName = List; }
             else if (modalConfig.type === 'abc') { modalTitle = `Análise de Concentração (Curva ABC)`; modalDesc = `Princípio de Pareto (80/15/5) para Gestão de Risco`; iconColor = 'text-indigo-600 bg-indigo-100'; IconName = Target; }
+            else if (modalConfig.type === 'manual') { modalTitle = `Manual do Usuário`; modalDesc = `Guia Rápido de Navegação e Interpretação de Métricas`; iconColor = 'text-blue-600 bg-blue-100'; IconName = BookOpen; }
 
             if (isLoadingAuto) {
                 return (
@@ -962,7 +948,7 @@
                             {!isAdminVerified ? (
                                 <>
                                     <h2 className="text-xl font-black text-slate-800 mb-2">Login no Dashboard</h2>
-                                    <p className="text-slate-500 text-xs mb-6">Introduza a sua credencial para aceder à performance comercial da sua região.</p>
+                                    <p className="text-slate-500 text-xs mb-6">Introduza a sua credencial para acessar à performance comercial da sua região.</p>
                                     <input type="password" placeholder="Senha de acesso..." value={passwordValue} onChange={e => setPasswordValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && verifyPassword()} autoFocus className={`w-full px-4 py-2.5 rounded-xl border text-center font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-3 text-sm ${passwordError ? 'border-rose-500' : 'border-slate-200'}`} />
                                     <button onClick={verifyPassword} className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl hover:bg-blue-700 transition-all text-sm mb-4">Entrar</button>
                                 </>
@@ -972,7 +958,7 @@
                                     <p className="text-slate-500 text-xs mb-6">Acesso autorizado. Carregue o CSV oficial com as vendas para visualizar a performance da sua região.</p>
                                     
                                     <div className="mt-4 pt-4 border-t border-slate-100">
-                                        <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Selecione o ficheiro de vendas</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mb-2 uppercase">Selecione o arquivo de vendas</p>
                                         <label className="block w-full cursor-pointer bg-slate-900 text-white font-bold py-3 rounded-xl text-sm hover:bg-black transition-colors">
                                             Selecionar Arquivo CSV
                                             <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
@@ -1014,7 +1000,7 @@
                                                         placeholder="Pesquisar..." searchable={true} 
                                                     />
                                                 </div>
-                                            ) : !['abc'].includes(modalConfig.type) ? (
+                                            ) : !['abc', 'manual'].includes(modalConfig.type) ? (
                                                 <div className="flex gap-2">
                                                     {['capilaridade', 'preco', 'analitico'].includes(modalConfig.type) && (
                                                         <div className="flex flex-col gap-0.5 min-w-[100px]">
@@ -1035,7 +1021,7 @@
                                                 </div>
                                             ) : null}
 
-                                            {!['abc'].includes(modalConfig.type) && (
+                                            {!['abc', 'manual'].includes(modalConfig.type) && (
                                                 <div className="w-[120px]"><CustomMultiSelect label="Filtrar UF" options={modalUfOptionsFormatted} selected={modalUfFilter} onChange={setModalUfFilter} placeholder="Todas" searchable={true} /></div>
                                             )}
                                             
@@ -1044,43 +1030,103 @@
                                                 {['preco'].includes(modalConfig.type) && <div className="flex items-center h-[28px] lg:h-[30px] px-2.5 bg-indigo-50 text-indigo-600 rounded-md border border-indigo-100 text-[10px] font-bold">{Number(precoModalData?.length || 0).toLocaleString('pt-BR')} produtos</div>}
                                                 {['analitico'].includes(modalConfig.type) && <div className="flex items-center h-[28px] lg:h-[30px] px-2.5 bg-slate-100 text-slate-600 rounded-md border border-slate-200 text-[10px] font-bold no-export">{Number(baseModalDataFiltered?.length || 0).toLocaleString('pt-BR')} linhas</div>}
                                                 
-                                                <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2 ml-1">
-                                                    <button onClick={handleExportExcel} className="h-[28px] lg:h-[30px] px-2.5 bg-emerald-50 text-emerald-700 rounded-md flex items-center justify-center hover:bg-emerald-100 transition-colors text-[10px] font-bold no-export gap-1 border border-emerald-100 shadow-sm" title="Exportar lista integral para Excel">
-                                                        <FileSpreadsheet size={12}/> Excel
-                                                    </button>
-                                                    {modalConfig.type !== 'analitico' && (
-                                                        <button onClick={() => exportToPDF(modalTitle, 'modal-export-area')} disabled={isExportingPDF} className="h-[28px] lg:h-[30px] px-2.5 bg-rose-50 text-rose-700 rounded-md flex items-center justify-center hover:bg-rose-100 transition-colors text-[10px] font-bold no-export gap-1 border border-rose-100 shadow-sm disabled:opacity-50" title="Exportar visão (Top 10) para PDF">
-                                                            {isExportingPDF ? <Loader2 size={12} className="animate-spin" /> : <Download size={12}/>} PDF
+                                                {modalConfig.type !== 'manual' && (
+                                                    <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2 ml-1">
+                                                        <button onClick={handleExportExcel} className="h-[28px] lg:h-[30px] px-2.5 bg-emerald-50 text-emerald-700 rounded-md flex items-center justify-center hover:bg-emerald-100 transition-colors text-[10px] font-bold no-export gap-1 border border-emerald-100 shadow-sm" title="Exportar lista integral para Excel">
+                                                            <FileSpreadsheet size={12}/> Excel
                                                         </button>
-                                                    )}
-                                                </div>
+                                                        {modalConfig.type !== 'analitico' && (
+                                                            <button onClick={() => exportToPDF(modalTitle, 'modal-export-area')} disabled={isExportingPDF} className="h-[28px] lg:h-[30px] px-2.5 bg-rose-50 text-rose-700 rounded-md flex items-center justify-center hover:bg-rose-100 transition-colors text-[10px] font-bold no-export gap-1 border border-rose-100 shadow-sm disabled:opacity-50" title="Exportar visão para PDF">
+                                                                {isExportingPDF ? <Loader2 size={12} className="animate-spin" /> : <Download size={12}/>} PDF
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
 
                                                 <button onClick={() => setModalConfig({isOpen: false, type: null})} className="h-[28px] w-[28px] lg:h-[30px] lg:w-[30px] bg-white border border-slate-200 rounded-md flex items-center justify-center hover:text-rose-500 hover:bg-rose-50 transition-colors no-export ml-1"><X size={14}/></button>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-1.5 pt-1 mt-0.5">
-                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider mr-1 flex items-center gap-1"><Search size={10} className="text-slate-400" /> Filtros Ativos:</span>
-                                        {(() => {
-                                            const a = [];
-                                            if (filters.years.length > 0) a.push({ l: 'Anos', v: filters.years.join(', ') });
-                                            if (filters.months.length > 0) a.push({ l: 'Meses', v: filters.months.map(m => MONTH_NAMES[Number(m)-1]).join(', ') });
-                                            if (filters.state.length > 0) a.push({ l: 'UF', v: filters.state.join(', ') });
-                                            if (filters.city.length > 0) a.push({ l: 'Cidade', v: filters.city.join(', ') });
-                                            if (filters.distributor.length > 0) a.push({ l: 'Distrib.', v: filters.distributor.join(', ') });
-                                            if (filters.customerType.length > 0) a.push({ l: 'Tipo Cli.', v: filters.customerType.join(', ') });
-                                            if (filters.type.length > 0) a.push({ l: 'Unidade', v: filters.type.join(', ') });
-                                            if (filters.product.length > 0) a.push({ l: 'Produto', v: filters.product.join(', ') });
-                                            if (filters.searchCustomer) a.push({ l: 'Busca Cli.', v: `"${filters.searchCustomer}"` });
-                                            if (filters.searchProduct) a.push({ l: 'Busca Prod.', v: `"${filters.searchProduct}"` });
-                                            if (a.length === 0) return <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Nenhum (Base Completa)</span>;
-                                            return a.map((f, i) => (<span key={i} className="text-[8px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1"><span className="text-blue-400 uppercase">{f.l}:</span> <span className="truncate max-w-[120px]" title={f.v}>{f.v}</span></span>));
-                                        })()}
-                                    </div>
+                                    {modalConfig.type !== 'manual' && (
+                                        <div className="flex flex-wrap items-center gap-1.5 pt-1 mt-0.5">
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider mr-1 flex items-center gap-1"><Search size={10} className="text-slate-400" /> Filtros Ativos:</span>
+                                            {(() => {
+                                                const a = [];
+                                                if (filters.years.length > 0) a.push({ l: 'Anos', v: filters.years.join(', ') });
+                                                if (filters.months.length > 0) a.push({ l: 'Meses', v: filters.months.map(m => MONTH_NAMES[Number(m)-1]).join(', ') });
+                                                if (filters.state.length > 0) a.push({ l: 'UF', v: filters.state.join(', ') });
+                                                if (filters.city.length > 0) a.push({ l: 'Cidade', v: filters.city.join(', ') });
+                                                if (filters.distributor.length > 0) a.push({ l: 'Distrib.', v: filters.distributor.join(', ') });
+                                                if (filters.customerType.length > 0) a.push({ l: 'Tipo Cli.', v: filters.customerType.join(', ') });
+                                                if (filters.type.length > 0) a.push({ l: 'Unidade', v: filters.type.join(', ') });
+                                                if (filters.product.length > 0) a.push({ l: 'Produto', v: filters.product.join(', ') });
+                                                if (filters.searchCustomer) a.push({ l: 'Busca Cli.', v: `"${filters.searchCustomer}"` });
+                                                if (filters.searchProduct) a.push({ l: 'Busca Prod.', v: `"${filters.searchProduct}"` });
+                                                if (a.length === 0) return <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">Nenhum (Base Completa)</span>;
+                                                return a.map((f, i) => (<span key={i} className="text-[8px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded flex items-center gap-1"><span className="text-blue-400 uppercase">{f.l}:</span> <span className="truncate max-w-[120px]" title={f.v}>{f.v}</span></span>));
+                                            })()}
+                                        </div>
+                                    )}
                                 </div>
                                 
                                 <div className="p-0 overflow-y-auto modal-scroll flex-1 bg-slate-50/50">
                                     {(() => {
+                                        if (modalConfig.type === 'manual') {
+                                            return (
+                                                <div className="p-8 text-slate-700 max-w-4xl mx-auto bg-white min-h-full">
+                                                    <h3 className="text-2xl font-black text-slate-800 mb-6 border-b border-slate-200 pb-3">Instruções de Uso</h3>
+                                                    
+                                                    <div className="space-y-8">
+                                                        <section>
+                                                            <h4 className="text-sm font-black text-blue-600 mb-2 uppercase tracking-wider">1. Introdução e Acesso Inicial</h4>
+                                                            <p className="text-sm leading-relaxed mb-2 text-slate-600">Bem-vindo ao Dashboard Comercial! Esta ferramenta foi desenvolvida para lhe dar total autonomia e clareza sobre a performance de vendas da sua região. Todo o processamento é feito diretamente no seu navegador, garantindo rapidez e a máxima segurança dos dados.</p>
+                                                        </section>
+                                                        
+                                                        <section>
+                                                            <h4 className="text-sm font-black text-blue-600 mb-2 uppercase tracking-wider">2. Filtros de Tempo (Períodos de Análise)</h4>
+                                                            <p className="text-sm text-slate-600 mb-3">No topo do painel, você encontrará botões que mudam toda a perspectiva dos dados. Eles comparam o momento atual com o exato mesmo período anterior:</p>
+                                                            <ul className="text-sm space-y-3 list-none pl-0">
+                                                                <li className="bg-slate-50 p-3 rounded border border-slate-100"><strong className="text-slate-800">YTD (Acumulado do Ano):</strong> Mostra a performance desde o dia 1º de Janeiro do ano atual até o último mês com vendas. Compara com os mesmos meses do ano anterior.</li>
+                                                                <li className="bg-slate-50 p-3 rounded border border-slate-100"><strong className="text-slate-800">UDM (Últimos Doze Meses):</strong> Considera uma janela contínua dos últimos 12 meses. Excelente para remover o efeito de sazonalidade.</li>
+                                                                <li className="bg-slate-50 p-3 rounded border border-slate-100"><strong className="text-slate-800">U6M (Últimos 6 Meses):</strong> Foca na tração recente e tendência de curto prazo.</li>
+                                                            </ul>
+                                                        </section>
+
+                                                        <section>
+                                                            <h4 className="text-sm font-black text-blue-600 mb-2 uppercase tracking-wider">3. Indicadores de Performance (KPIs)</h4>
+                                                            <ul className="text-sm space-y-3 list-none pl-0">
+                                                                <li className="flex items-start gap-2"><span className="text-blue-500 mt-1">•</span><div><strong className="text-slate-800">Faturamento:</strong> Receita bruta total gerada no período.</div></li>
+                                                                <li className="flex items-start gap-2"><span className="text-blue-500 mt-1">•</span><div><strong className="text-slate-800">Preço Médio:</strong> Faturamento Total / Quantidade Total vendida. Ajuda a entender descontos ou mudanças de mix.</div></li>
+                                                                <li className="flex items-start gap-2"><span className="text-blue-500 mt-1">•</span><div><strong className="text-slate-800">Capilaridade:</strong> Quantidade de PDVs (Pontos de Venda) únicos que compraram no período.</div></li>
+                                                                <li className="flex items-start gap-2"><span className="text-blue-500 mt-1">•</span><div><strong className="text-slate-800">Clientes Novos:</strong> Compraram no período atual, mas NÃO tinham registro no período comparativo.</div></li>
+                                                                <li className="flex items-start gap-2"><span className="text-blue-500 mt-1">•</span><div><strong className="text-slate-800">Clientes Perdidos (Churn):</strong> Compraram no passado, mas estão zerados no período atual (Inativos).</div></li>
+                                                                <li className="flex items-start gap-2"><span className="text-blue-500 mt-1">•</span><div><strong className="text-slate-800">Em Alerta (Risco de Churn):</strong> Clientes ativos que já ultrapassaram o tempo esperado de recompra baseado na sua média mensal.</div></li>
+                                                            </ul>
+                                                        </section>
+
+                                                        <section>
+                                                            <h4 className="text-sm font-black text-blue-600 mb-2 uppercase tracking-wider">4. Visões Gráficas e Raio-X</h4>
+                                                            <p className="text-sm leading-relaxed mb-3 text-slate-600">O painel exibe o Top 10 de Produtos, Distribuidores e Clientes. O segredo desta seção são os botões <strong className="text-slate-800">"Raio-X"</strong> em cada bloco. Ao clicar, abrirá uma janela onde você poderá:</p>
+                                                            <ul className="text-sm space-y-2 list-disc pl-5 text-slate-600">
+                                                                <li>Pesquisar por um cliente/produto específico e ver todo o seu histórico individual.</li>
+                                                                <li>Ver os produtos preferidos de um determinado cliente.</li>
+                                                                <li>Ver quais clientes mais compram um determinado produto.</li>
+                                                            </ul>
+                                                        </section>
+
+                                                        <section>
+                                                            <h4 className="text-sm font-black text-blue-600 mb-2 uppercase tracking-wider">5. Funcionalidades Avançadas e Exportação</h4>
+                                                            <ul className="text-sm space-y-3 list-none pl-0">
+                                                                <li className="bg-indigo-50 p-3 rounded border border-indigo-100"><strong className="text-indigo-800">Curva ABC:</strong> Ferramenta estratégica baseada no Princípio de Pareto. Separa os seus itens em Curva A (vital, 80\% da receita), B (potencial, próximos 15\%) e C (cauda longa de alto custo, últimos 5\%).</li>
+                                                                <li className="bg-slate-50 p-3 rounded border border-slate-100"><strong className="text-slate-800">Visão Analítica:</strong> Tabela no formato de Excel (Raw Data) refletindo os filtros aplicados no momento.</li>
+                                                                <li className="bg-slate-50 p-3 rounded border border-slate-100"><strong className="text-slate-800">Exportação:</strong> Use o botão <strong className="text-rose-600">PDF</strong> para baixar telas limpas para apresentações, e o botão <strong className="text-emerald-600">Excel</strong> para manipular os dados na sua planilha.</li>
+                                                            </ul>
+                                                        </section>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
                                         if (modalConfig.type === 'abc' && abcData) {
                                             return (
                                                 <div className="p-5">
@@ -1258,12 +1304,7 @@
                                                                         <XAxis type="number" hide />
                                                                         <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} tickFormatter={v => String(v).length > 10 ? String(v).substring(0,10)+'...' : v} tick={{fontSize: 8, fontWeight: 600, fill: '#64748b'}} />
                                                                         <Tooltip formatter={(v) => [isFat ? formatCurrency(v) : `${Number(v).toLocaleString('pt-BR')} un`, isFat ? 'Faturamento' : 'Quantidade']} cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '9px', fontWeight: 'bold'}} />
-                                                                        <Bar dataKey={isFat ? 'valor' : 'qty'} fill={modalConfig.type==='produtos' ? "#10b981" : "#3b82f6"} radius={[0, 4, 4, 0]} barSize={8} label={(props) => {
-                                                                            const { x, y, width, height, value } = props;
-                                                                            if (value === undefined || value === null) return null;
-                                                                            const fillCol = modalConfig.type==='produtos' ? "#10b981" : "#3b82f6";
-                                                                            return <text x={(x||0) + (width||0) + 4} y={(y||0) + (height||0) / 2 + 1} fill={fillCol} textAnchor="start" dominantBaseline="central" fontSize="9" fontWeight="bold">{isFat ? `R$ ${formatShortNumber(value)}` : `${(Number(value) || 0).toLocaleString('pt-BR')} un`}</text>;
-                                                                        }} />
+                                                                        <Bar dataKey={isFat ? 'valor' : 'qty'} fill={modalConfig.type==='produtos' ? "#10b981" : "#3b82f6"} radius={[0, 4, 4, 0]} barSize={8} label={renderBarLabel(isFat, modalConfig.type==='produtos' ? "#10b981" : "#3b82f6")} />
                                                                     </BarChart>
                                                                 </ResponsiveContainer>
                                                             </div>
@@ -1502,12 +1543,13 @@
                             </div>
                             <div className="flex items-center gap-1.5">
                                 {lastUpdate && <div className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-100 px-2 py-1 rounded flex items-center gap-1"><Clock size={10} className="text-slate-400" /> Atualizado: <span className="text-slate-700">{lastUpdate}</span></div>}
+                                <button onClick={() => openModal('manual')} className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded text-[9px] font-bold hover:bg-blue-100 transition-colors no-export"><BookOpen size={10}/> Manual</button>
                                 <button onClick={() => exportToPDF('Visao_Global_Dashboard', 'main-dashboard-export-area')} disabled={isExportingPDF} className="flex items-center gap-1 bg-slate-900 text-white px-2.5 py-1 rounded text-[9px] font-bold hover:bg-black transition-colors no-export disabled:opacity-50">
                                     {isExportingPDF ? <Loader2 size={10} className="animate-spin" /> : <Download size={10}/>}
                                     {isExportingPDF ? 'A Gerar...' : 'Exportar Tela'}
                                 </button>
                                 <button onClick={() => openModal('abc')} className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded text-[9px] font-bold hover:bg-indigo-100 transition-colors"><Target size={10}/> Curva ABC</button>
-                                <button onClick={() => openModal('analitico')} className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded text-[9px] font-bold hover:bg-blue-100 transition-colors"><List size={10}/> Visão Analítica</button>
+                                <button onClick={() => openModal('analitico')} className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded text-[9px] font-bold hover:bg-emerald-100 transition-colors"><List size={10}/> Visão Analítica</button>
                                 <button onClick={() => { setShowUploadScreen(true); setIsLoaded(false); }} className="flex items-center gap-1 bg-slate-900 text-white px-2.5 py-1 rounded text-[9px] font-bold hover:bg-black transition-colors"><Upload size={10}/> Arquivo</button>
                                 <button onClick={() => { setShowUploadScreen(true); setIsLoaded(false); setCurrentUser(null); setPasswordValue(''); setIsAdminVerified(false); }} className="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded text-[9px] font-bold hover:bg-rose-100 transition-colors"><UserMinus size={10}/> Sair</button>
                             </div>
@@ -1603,11 +1645,11 @@
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-1.5 mt-1.5">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-1.5 mt-1.5 mb-4">
                             {[
-                                { title: 'Top Produtos', data: topProducts, icon: Package, color: 'text-blue-600', fill: '#3b82f6', formatter: renderProductBarLabel },
-                                { title: 'Top Distribuidores', data: topDistribuidores, icon: Truck, color: 'text-emerald-500', fill: '#10b981', formatter: renderDistributorBarLabel },
-                                { title: 'Top Clientes', data: topClients, icon: Users, color: 'text-fuchsia-500', fill: '#f59e0b', formatter: renderClientBarLabel }
+                                { title: 'Top Produtos', data: topProducts, icon: Package, color: 'text-blue-600', fill: '#3b82f6', formatter: renderBarLabel(false, '#3b82f6') },
+                                { title: 'Top Distribuidores', data: topDistribuidores, icon: Truck, color: 'text-emerald-500', fill: '#10b981', formatter: renderBarLabel(true, '#10b981') },
+                                { title: 'Top Clientes', data: topClients, icon: Users, color: 'text-fuchsia-500', fill: '#f59e0b', formatter: renderBarLabel(true, '#f59e0b') }
                             ].map((rank) => {
                                 const RankIcon = rank.icon;
                                 return (
@@ -1631,6 +1673,16 @@
                                 </div>
                             )})}
                         </div>
+                        
+                        {/* RODAPÉ DESENVOLVEDOR */}
+                        {isLoaded && !showUploadScreen && (
+                            <div className="text-center mt-2 pb-6 no-export">
+                                <p className="text-[10px] text-slate-400 font-semibold tracking-wider">
+                                    DESENVOLVIDO POR: <a href="mailto:george.gos@gmail.com" className="text-blue-500 hover:text-blue-700 font-black hover:underline transition-colors ml-1">GEORGE SILVA</a>
+                                </p>
+                            </div>
+                        )}
+                        
                     </div>
                 </div>
             );
