@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Score - Sell Out George</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); }
+        .file-drop-area { border: 2px dashed #cbd5e1; transition: all 0.3s ease; }
+        .file-drop-area.dragover { border-color: #3b82f6; background-color: #eff6ff; }
+        
+        .loader {
+            border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%;
+            width: 24px; height: 24px; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .quarter-checkbox:checked + label { background-color: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #3b82f6; }
+        input:checked + .slider:before { transform: translateX(22px); }
+        
+        .threshold-alert { background-color: #fff1f2; border: 1px solid #fecaca; }
+        .barrier-pill { font-size: 9px; padding: 1px 4px; border-radius: 4px; font-weight: bold; background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+        
+        .salary-helper { border-left: 4px solid #3b82f6; }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        
+        <div class="glass-panel p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800"><i class="fa-solid fa-shield-halved text-blue-500 mr-2"></i> Simulador de Bônus TP-Link</h1>
+                <p class="text-sm text-slate-500 mt-1">Cálculo YTD, Crescimento TOP 20 YoY e Regra de Barreira Q4</p>
+            </div>
+            
+            <div class="flex gap-4">
+                <div class="bg-blue-50 px-6 py-3 rounded-xl border border-blue-100 shadow-inner text-center min-w-[150px]">
+                    <p id="scoreLabelHeader" class="text-[10px] font-bold text-blue-400 uppercase text-left">Score do Período</p>
+                    <span id="finalScoreDisplay" class="text-2xl font-bold text-blue-800">0.00%</span>
+                </div>
+                <div class="bg-green-50 px-6 py-3 rounded-xl border border-green-100 shadow-inner text-center min-w-[150px]">
+                    <p class="text-[10px] font-bold text-green-400 uppercase text-left">Líquido a Receber</p>
+                    <span id="netPaymentDisplay" class="text-2xl font-bold text-green-800">R$ 0,00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <div class="space-y-6">
+                
+                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Período de Análise</h2>
+                        <div class="flex items-center bg-slate-100 px-2 py-1 rounded-full border border-slate-200">
+                            <span class="text-[10px] font-bold text-slate-500 mr-2">WISP ONLY:</span>
+                            <label class="switch"><input type="checkbox" id="filterWispOnly" checked><span class="slider"></span></label>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-2">Trimestres (Múltipla Seleção)</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="relative">
+                                    <input type="checkbox" id="q1" value="Q1" class="quarter-checkbox hidden peer">
+                                    <label for="q1" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q1</label>
+                                </div>
+                                <div class="relative">
+                                    <input type="checkbox" id="q2" value="Q2" class="quarter-checkbox hidden peer">
+                                    <label for="q2" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q2</label>
+                                </div>
+                                <div class="relative">
+                                    <input type="checkbox" id="q3" value="Q3" class="quarter-checkbox hidden peer" checked>
+                                    <label for="q3" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q3</label>
+                                </div>
+                                <div class="relative">
+                                    <input type="checkbox" id="q4" value="Q4" class="quarter-checkbox hidden peer" checked>
+                                    <label for="q4" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q4</label>
+                                </div>
+                            </div>
+                            <div class="flex justify-between mt-2 px-1">
+                                <button type="button" onclick="selectAllQuarters(true)" class="text-[10px] font-bold text-blue-500 hover:text-blue-700 uppercase tracking-wider">Selecionar Todos</button>
+                                <button type="button" onclick="selectAllQuarters(false)" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider">Limpar</button>
+                            </div>
+                        </div>
+
+                        <select id="filterYear" class="w-full bg-slate-50 border p-2 rounded-lg text-sm font-bold outline-none focus:border-blue-500">
+                            <option value="ALL">Analisar base CSV toda</option>
+                            <option value="2023">Ano Atual: 2023</option>
+                            <option value="2024">Ano Atual: 2024</option>
+                            <option value="2025" selected>Ano Atual: 2025</option>
+                            <option value="2026">Ano Atual: 2026</option>
+                        </select>
+                    </div>
+
+                    <div id="ruleInfoBox" class="mt-4 p-3 rounded-lg text-[10px] border leading-relaxed"></div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-blue-200 bg-blue-50/20 salary-helper">
+                    <h2 class="text-xs font-black text-blue-700 mb-3 flex items-center"><i class="fa-solid fa-calculator mr-2"></i>Ajudante Pró-rata Salarial</h2>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase">Salário 1 (R$)</label>
+                                <input type="number" id="salary1" value="14000" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase">Meses</label>
+                                <input type="number" id="salary1Months" value="10" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase">Salário 2 (R$)</label>
+                                <input type="number" id="salary2" value="14700" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 uppercase">Meses</label>
+                                <input type="number" id="salary2Months" value="2" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
+                            </div>
+                        </div>
+                        <button onclick="applySalaryToBonus()" class="w-full py-2 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase shadow-sm hover:bg-blue-700 transition-colors">Aplicar ao Bônus Target</button>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-indigo-100 bg-indigo-50/30">
+                    <h2 class="text-sm font-bold text-indigo-800 mb-4 flex items-center"><i class="fa-solid fa-money-bill-trend-up mr-2"></i>Simulador de Pagamento</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Bônus Anual Target (4 salários)</label>
+                            <div class="relative"><span class="absolute left-3 top-2 text-slate-400 text-sm">R$</span><input type="number" id="bonusPotential" value="56466.67" class="w-full pl-9 p-2 border rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-red-400 uppercase mb-1">Total Já Pago Anteriormente</label>
+                            <div class="relative"><span class="absolute left-3 top-2 text-slate-400 text-sm">R$</span><input type="number" id="bonusAlreadyPaid" value="15000" class="w-full pl-9 p-2 border rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-red-500"></div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-indigo-100">
+                        <div class="flex justify-between text-[10px] text-slate-500 uppercase font-bold mb-1"><span>Devido no Período:</span><span id="ytdTotalValue" class="text-slate-700">R$ 0,00</span></div>
+                        <div class="flex justify-between text-sm font-black text-indigo-600"><span>A Receber Líquido:</span><span id="netToPayValue">R$ 0,00</span></div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl shadow-sm">
+                    <h2 class="text-sm font-bold text-slate-700 mb-4 border-b pb-2 flex items-center justify-between">Configuração de Metas</h2>
+                    <div class="mb-5">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Base das Metas Inseridas Abaixo</label>
+                        <select id="targetBasePeriod" class="w-full bg-white border p-2 rounded-lg text-xs font-black outline-none">
+                            <option value="1">Os valores são Trimestrais (1Q)</option>
+                            <option value="2" selected>Os valores são Semestrais (H)</option>
+                            <option value="4">Os valores são Anuais (4Q)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-3" id="targetsForm">
+                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">Provider Capillarity <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetCapillarity" value="2021" class="border rounded p-1.5 text-sm font-bold target-input"></div>
+                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">Total Revenue (R$) <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" step="0.01" id="targetTotalRev" value="31991478.83" class="border rounded p-1.5 text-sm font-bold target-input"></div>
+                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">ENBU Revenue (R$) <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" step="0.01" id="targetEnbuRev" value="1749158.91" class="border rounded p-1.5 text-sm font-bold target-input"></div>
+                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">Router Vol. <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetWifi6Router" value="81486" class="border rounded p-1.5 text-sm font-bold target-input"></div>
+                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">ONT Vol. <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetWifi6Ont" value="29478" class="border rounded p-1.5 text-sm font-bold target-input"></div>
+                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">OLT Product <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetOlt" value="79" class="border rounded p-1.5 text-sm font-bold target-input"></div>
+                        
+                        <div class="p-3 bg-blue-50 border border-blue-100 rounded-xl space-y-2">
+                            <label class="text-[10px] font-bold text-blue-600 uppercase flex justify-between items-center">TOP 20 Growth (YoY) <span class="barrier-pill">BARREIRA 80%</span></label>
+                            <input type="number" id="targetTop20" value="5000000" class="border rounded p-1.5 w-full text-xs font-bold target-input" title="Meta de Crescimento em Reais (R$) para os TOP 20">
+                            <input type="number" id="achieveTop20" value="0" class="border rounded p-1.5 w-full text-xs font-bold target-input bg-white text-blue-700" title="Digite o override manual se desejar. Se 0, calcula Crescimento YoY automático.">
+                            <p class="text-[8px] text-blue-400 leading-tight italic">Crescimento Automático: (Vendas Top 20 Atual - Vendas Top 20 Ano Anterior).</p>
+                        </div>
+
+                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase">Director Eval (0.0 - 1.0)</label><input type="number" step="0.1" id="targetDirector" value="1" class="border rounded p-1.5 text-sm font-bold"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+                
+                <div class="glass-panel p-6 rounded-2xl shadow-sm overflow-hidden bg-white border border-slate-200">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 id="tableTitle" class="text-lg font-bold text-slate-800">Cálculo de Score do Período</h2>
+                        <div id="loadingIndicator" class="hidden flex items-center text-blue-600 font-medium text-xs">
+                            <div class="loader mr-2 !w-3 !h-3"></div> Analisando bases...
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 mb-8 text-center transition-colors hover:bg-slate-100" id="uploadArea">
+                        <div id="dropZone" class="cursor-pointer">
+                            <i class="fa-solid fa-cloud-arrow-up text-4xl text-blue-400 mb-3"></i>
+                            <p class="text-sm font-bold text-slate-700">Importe os ficheiros CSV (Sell Out)</p>
+                            <input type="file" id="csvFileInput" class="hidden" multiple accept=".csv">
+                        </div>
+                        <div id="fileList" class="mt-6 flex flex-wrap gap-2 justify-center"></div>
+                        <button id="processBtn" class="mt-8 bg-slate-800 hover:bg-black text-white font-black py-3 px-10 rounded-xl shadow-lg disabled:opacity-30 transition-all" disabled>PROCESSAR E CALCULAR</button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black">
+                                    <th class="px-4 py-4 border-b">KPI Item</th>
+                                    <th class="px-4 py-4 border-b text-right">Meta Proporcional</th>
+                                    <th class="px-4 py-4 border-b text-right">Real Alcançado</th>
+                                    <th class="px-4 py-4 border-b text-center">% Ating.</th>
+                                    <th class="px-4 py-4 border-b text-right">Score Parcial</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody" class="divide-y divide-slate-100"></tbody>
+                            <tfoot class="bg-blue-50 font-black border-t-2">
+                                <tr>
+                                    <td id="footerLabel" class="px-4 py-5" colspan="4">Score do Período Selecionado</td>
+                                    <td class="px-4 py-5 text-right text-xl text-blue-700" id="totalScoreCell">0.00%</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl shadow-sm bg-white border border-slate-200">
+                    <h2 class="text-sm font-bold text-slate-700 mb-6 flex items-center tracking-widest uppercase"><i class="fa-solid fa-users mr-3 text-blue-400"></i>Capilaridade Mensal Única</h2>
+                    <div id="monthlyBreakdownContainer" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="messageModal" class="fixed inset-0 bg-slate-900/70 hidden flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center">
+            <h3 class="text-xl font-bold text-slate-800 mb-6" id="modalMessage">Info</h3>
+            <button onclick="closeModal()" class="w-full py-4 bg-slate-900 text-white font-black rounded-2xl">ENTENDI</button>
+        </div>
+    </div>
+
+    <script>
+        let uploadedFiles = [];
+        let rawData = [];
+        
+        const KPI_CONFIG = [
+            { id: 'capillarity', name: 'Provider Capillarity', ratio: 0.30, maxRemark: 1.2, isInt: true, hasFloor: true },
+            { id: 'totalRev', name: 'Total Revenue', ratio: 0.20, maxRemark: 1.2, isCurrency: true, hasFloor: true },
+            { id: 'enbuRev', name: 'ENBU Revenue', ratio: 0.10, maxRemark: 1.2, isCurrency: true, hasFloor: true },
+            { id: 'top20', name: 'TOP 20 Customers Growth', ratio: 0.10, maxRemark: 1.2, isCurrency: true, hasFloor: true },
+            { id: 'wifi6Router', name: 'Wi-Fi 6 & 7 Router Vol', ratio: 0.05, maxRemark: 1.2, isInt: true, hasFloor: true },
+            { id: 'wifi6Ont', name: 'Wi-Fi 6 & 7 ONT Vol', ratio: 0.05, maxRemark: 1.2, isInt: true, hasFloor: true },
+            { id: 'olt', name: 'OLT Product Volume', ratio: 0.05, maxRemark: 1.2, isInt: true, hasFloor: true },
+            { id: 'tauc', name: 'TAUC Sales', ratio: 0.05, maxRemark: 1.2, isAutoHit: true },
+            { id: 'director', name: 'Director Eval', ratio: 0.10, maxRemark: 1.0, isFixedScale: true }
+        ];
+
+        const formatBRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+        const formatNum = (v) => new Intl.NumberFormat('pt-BR').format(v);
+        const formatPct = (v) => (v * 100).toFixed(2) + '%';
+
+        const filterWispOnly = document.getElementById('filterWispOnly');
+        const filterYear = document.getElementById('filterYear');
+        const quarterCheckboxes = document.querySelectorAll('.quarter-checkbox');
+        const bonusPotentialInput = document.getElementById('bonusPotential');
+        const bonusAlreadyPaidInput = document.getElementById('bonusAlreadyPaid');
+        const targetBasePeriodSelect = document.getElementById('targetBasePeriod');
+
+        window.selectAllQuarters = function(state) {
+            quarterCheckboxes.forEach(cb => cb.checked = state);
+            triggerRecalculation();
+        }
+
+        window.applySalaryToBonus = function() {
+            const s1 = parseFloat(document.getElementById('salary1').value) || 0;
+            const m1 = parseFloat(document.getElementById('salary1Months').value) || 0;
+            const s2 = parseFloat(document.getElementById('salary2').value) || 0;
+            const m2 = parseFloat(document.getElementById('salary2Months').value) || 0;
+            const weightedAnnualPotential = ((s1 * m1) + (s2 * m2)) / (m1 + m2) * 4;
+            bonusPotentialInput.value = weightedAnnualPotential.toFixed(2);
+            showModal("Bônus anual target atualizado para " + formatBRL(weightedAnnualPotential));
+            triggerRecalculation();
+        };
+
+        function getSelectedQuarters() { return Array.from(quarterCheckboxes).filter(cb => cb.checked).map(cb => cb.value); }
+        function getScale() { 
+            const count = getSelectedQuarters().length; 
+            const divisor = parseInt(targetBasePeriodSelect.value) || 2;
+            return count > 0 ? count / divisor : 0;
+        }
+
+        function triggerRecalculation() {
+            updateLabels();
+            if (rawData.length > 0) calculateKPIs(); else renderTable();
+        }
+
+        function updateLabels() {
+            const qs = getSelectedQuarters();
+            const hasQ4 = qs.includes("Q4");
+            const box = document.getElementById('ruleInfoBox');
+            const scoreLabel = document.getElementById('scoreLabelHeader');
+            const footerLabel = document.getElementById('footerLabel');
+            const tableTitle = document.getElementById('tableTitle');
+
+            let labelText = "Score do Período";
+            if (qs.length === 1) labelText = "Score (" + qs[0] + ")";
+            else if (qs.length === 2 && qs.includes("Q1") && qs.includes("Q2")) labelText = "Score do H1";
+            else if (qs.length === 2 && qs.includes("Q3") && qs.includes("Q4")) labelText = "Score do H2";
+            else if (qs.length === 4) labelText = "Score Anual";
+            else if (qs.length > 0) labelText = "Score (" + qs.join("+") + ")";
+
+            if (scoreLabel) scoreLabel.innerText = labelText;
+            if (footerLabel) footerLabel.innerText = labelText;
+            if (tableTitle) tableTitle.innerText = "Detalhamento: " + labelText;
+
+            if (box) {
+                if (hasQ4) {
+                    box.className = "mt-4 p-3 rounded-lg text-[10px] bg-red-50 text-red-700 border-red-200 font-bold shadow-sm";
+                    box.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> BARREIRA ATIVA: Abaixo de 80% = Score 0.`;
+                } else {
+                    box.className = "mt-4 p-3 rounded-lg text-[10px] bg-slate-50 text-slate-500 border border-dashed";
+                    box.innerHTML = `<i class="fa-solid fa-circle-info text-blue-400 mr-1"></i> A regra de barreira (80%) aplica-se apenas no Q4.`;
+                }
+            }
+        }
+
+        [filterWispOnly, filterYear, bonusPotentialInput, bonusAlreadyPaidInput, targetBasePeriodSelect].forEach(el => el && (el.onchange = triggerRecalculation));
+        quarterCheckboxes.forEach(cb => cb.addEventListener('change', triggerRecalculation));
+        document.querySelectorAll('.target-input').forEach(el => el.oninput = triggerRecalculation);
+
+        document.getElementById('dropZone').onclick = () => document.getElementById('csvFileInput').click();
+        document.getElementById('csvFileInput').onchange = (e) => handleFiles(e.target.files);
+
+        function handleFiles(files) {
+            for(let f of files) if(f.name.endsWith('.csv')) uploadedFiles.push(f);
+            document.getElementById('fileList').innerHTML = uploadedFiles.map((f, i) => `<div class="bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] border flex gap-2 items-center font-bold shadow-sm text-blue-800"><span>${f.name}</span><button onclick="removeFile(${i})" class="text-red-500"><i class="fa-solid fa-xmark"></i></button></div>`).join('');
+            document.getElementById('processBtn').disabled = uploadedFiles.length === 0;
+        }
+
+        window.removeFile = (i) => { uploadedFiles.splice(i, 1); handleFiles([]); if(!uploadedFiles.length) { rawData=[]; renderTable(); } };
+
+        document.getElementById('processBtn').onclick = () => {
+            document.getElementById('processBtn').disabled = true; document.getElementById('loadingIndicator').classList.remove('hidden');
+            rawData = []; let count = 0;
+            uploadedFiles.forEach(f => {
+                Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => {
+                    rawData = rawData.concat(res.data);
+                    if (++count === uploadedFiles.length) { calculateKPIs(); document.getElementById('processBtn').disabled = false; document.getElementById('loadingIndicator').classList.add('hidden'); }
+                }});
+            });
+        };
+
+        function calculateKPIs() {
+            const results = { capillarity: 0, totalRev: 0, enbuRev: 0, wifi6Router: 0, wifi6Ont: 0, olt: 0, tauc: 0, top20: 0, director: parseFloat(document.getElementById('targetDirector').value) || 1 };
+            const qs = getSelectedQuarters();
+            const y = filterYear.value;
+            const wispOnly = filterWispOnly.checked;
+            
+            const previousYearStr = y !== "ALL" ? (parseInt(y) - 1).toString() : null;
+
+            const monthlyProviders = {};
+            const customerRevenue = {};     
+            const customerRevenuePrev = {}; 
+
+            rawData.forEach(row => {
+                const rQ = (row['Quarter'] || '').trim().toUpperCase();
+                const rY = (row['Year'] || '').trim();
+                
+                if (qs.length > 0 && !qs.includes(rQ)) return;
+                
+                const isCurrentYear = (y === "ALL" || rY === y);
+                const isPreviousYear = (y !== "ALL" && rY === previousYearStr);
+
+                if (!isCurrentYear && !isPreviousYear) return;
+
+                const recat = (row['Recategorização'] || '').trim().toUpperCase();
+                const custType = (row['Customer Type'] || '').trim().toUpperCase();
+                if (wispOnly && !recat.includes('WISP') && !custType.includes('WISP')) return;
+
+                const amt = parseFloat(row['Amount']) || 0;
+                const qty = parseInt(row['Qty']) || 0;
+                const type = (row['Type'] || '').trim();
+                const sub = (row['subcategory'] || '').trim();
+                const std = (row['Standard'] || '').trim();
+                const category = (row['category'] || '').trim();
+                const custKey = (row['cnpj'] || row['customer'] || 'Unknown').trim();
+
+                if (isCurrentYear) {
+                    results.totalRev += amt;
+                    if (type === 'Enterprise Networking') results.enbuRev += amt;
+                    customerRevenue[custKey] = (customerRevenue[custKey] || 0) + amt;
+
+                    if (recat === 'WISP-PROVIDER' || custType === 'WISP-PROVIDER') {
+                        const mNum = parseInt(row['Month']) || 0;
+                        const key = `${rY}-${mNum || 'X'}`;
+                        if (!monthlyProviders[key]) monthlyProviders[key] = new Set();
+                        if (row['cnpj']) monthlyProviders[key].add(row['cnpj']);
+                    }
+
+                    const spbu = (row['Use of Order Placing'] || '').trim() === 'Service Provider' || category === 'Aginet';
+                    if (spbu && (/EX/i.test(std) || /Wi-Fi (6|7)/i.test(sub))) { if (sub.includes('Router') || std.includes('EX')) results.wifi6Router += qty; }
+                    if (spbu && (sub === 'HGU' || /XC|XZ/i.test(std))) { if (/XX|XZ/i.test(std) || sub.includes('Wi-Fi 6') || sub === 'HGU') results.wifi6Ont += qty; }
+                    if (/(OLT|Service Board)/i.test(std + sub + category)) results.olt += qty;
+                }
+
+                if (isPreviousYear) {
+                    customerRevenuePrev[custKey] = (customerRevenuePrev[custKey] || 0) + amt;
+                }
+            });
+
+            // TOP 20 Growth YoY
+            const manualTop20 = parseFloat(document.getElementById('achieveTop20').value) || 0;
+            if (manualTop20 !== 0) {
+                results.top20 = manualTop20;
+            } else if (y !== "ALL") {
+                const sortedRevKeys = Object.keys(customerRevenue).sort((a,b) => customerRevenue[b] - customerRevenue[a]);
+                const top20Keys = sortedRevKeys.slice(0, 20);
+                let currTotal = 0; let prevTotal = 0;
+                top20Keys.forEach(k => {
+                    currTotal += customerRevenue[k];
+                    prevTotal += (customerRevenuePrev[k] || 0);
+                });
+                results.top20 = currTotal - prevTotal;
+            }
+
+            const mbContainer = document.getElementById('monthlyBreakdownContainer');
+            if (mbContainer) {
+                mbContainer.innerHTML = '';
+                Object.keys(monthlyProviders).sort((a,b) => {
+                    const [y1, m1] = a.split('-'); const [y2, m2] = b.split('-');
+                    return y1 === y2 ? parseInt(m1) - parseInt(m2) : parseInt(y1) - parseInt(y2);
+                }).forEach(k => {
+                    const c = monthlyProviders[k].size; results.capillarity += c;
+                    mbContainer.innerHTML += `<div class="bg-white border rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-colors">
+                        <div class="text-[10px] font-black text-blue-400 uppercase mb-1">${k.replace('-',' / ')}</div>
+                        <div class="text-xl font-black text-slate-800">${formatNum(c)}</div>
+                        <div class="text-[8px] text-slate-400 uppercase font-bold mt-1">Únicos</div>
+                    </div>`;
+                });
+            }
+            renderTable(results);
+        }
+
+        function renderTable(results = {}) {
+            const tbody = document.getElementById('resultsTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            let totalScore = 0;
+            const mult = getScale();
+            const selectedQs = getSelectedQuarters();
+            const applyFloor = selectedQs.includes("Q4");
+
+            KPI_CONFIG.forEach(kpi => {
+                let baseTarget = parseFloat(document.getElementById(`target${kpi.id.charAt(0).toUpperCase() + kpi.id.slice(1)}`)?.value) || 0;
+                let appliedTarget = kpi.isFixedScale ? 1 : (baseTarget * mult);
+                if (kpi.isInt) appliedTarget = Math.round(appliedTarget);
+
+                let achieve = kpi.isAutoHit ? appliedTarget : (results[kpi.id] || 0);
+                let percent = appliedTarget > 0 ? achieve / appliedTarget : 0;
+                let floorTriggered = applyFloor && kpi.hasFloor && percent < 0.8;
+                let finalKpiScore = floorTriggered ? 0 : Math.min(percent, kpi.maxRemark) * kpi.ratio;
+                totalScore += finalKpiScore;
+
+                tbody.innerHTML += `<tr class="hover:bg-slate-50 transition-colors group ${floorTriggered ? 'threshold-alert' : ''}">
+                    <td class="px-4 py-4 border-b">
+                        <div class="flex flex-col">
+                            <span class="font-bold text-slate-700 text-xs">${kpi.name}</span>
+                            ${kpi.hasFloor ? '<span class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">Regra de Barreira 80%</span>' : ''}
+                        </div>
+                    </td>
+                    <td class="px-4 py-4 border-b text-right font-medium text-slate-500 text-xs">${kpi.isCurrency ? formatBRL(appliedTarget) : formatNum(appliedTarget)}</td>
+                    <td class="px-4 py-4 border-b text-right font-black text-slate-800 text-xs">${kpi.isCurrency ? formatBRL(achieve) : formatNum(achieve)}</td>
+                    <td class="px-4 py-4 border-b text-center">
+                        <span class="px-3 py-1 rounded-full text-[10px] font-black ${floorTriggered ? 'bg-red-600 text-white shadow-sm' : (percent >= 1 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500')}">
+                            ${formatPct(percent)}
+                        </span>
+                    </td>
+                    <td class="px-4 py-4 border-b text-right font-black text-sm ${floorTriggered ? 'text-red-600' : 'text-slate-900'}">
+                        ${formatPct(finalKpiScore)}
+                    </td>
+                </tr>`;
+            });
+
+            document.getElementById('totalScoreCell').innerText = formatPct(totalScore);
+            document.getElementById('finalScoreDisplay').innerText = formatPct(totalScore);
+
+            const pot = parseFloat(bonusPotentialInput.value) || 0;
+            const paid = parseFloat(bonusAlreadyPaidInput.value) || 0;
+            const ytdEarned = pot * (selectedQs.length / 4.0) * totalScore;
+            const net = ytdEarned - paid;
+
+            document.getElementById('ytdTotalValue').innerText = formatBRL(ytdEarned);
+            document.getElementById('netToPayValue').innerText = formatBRL(net);
+            document.getElementById('netPaymentDisplay').innerText = formatBRL(net);
+            document.getElementById('netToPayValue').className = net < 0 ? "text-sm font-black text-red-600" : "font-black text-green-600";
+        }
+
+        function showModal(m) { document.getElementById('modalMessage').innerText = m; document.getElementById('messageModal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('messageModal').classList.add('hidden'); }
+        window.onload = () => triggerRecalculation();
+    </script>
+</body>
+</html>
