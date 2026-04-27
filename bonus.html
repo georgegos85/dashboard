@@ -55,9 +55,16 @@
             </div>
             
             <div class="flex gap-4 items-center">
-                <button onclick="exportToPDF()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2 text-xs uppercase" title="Exportar para PDF">
-                    <i class="fa-solid fa-file-pdf text-lg"></i> <span class="hidden md:inline">Exportar PDF</span>
-                </button>
+                <!-- Botões (Não saem na exportação PDF graças ao atributo data-html2canvas-ignore) -->
+                <div class="flex gap-2" data-html2canvas-ignore="true">
+                    <button onclick="openManual()" class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2 text-xs uppercase" title="Manual de Utilizador">
+                        <i class="fa-solid fa-book text-lg"></i> <span class="hidden md:inline">Manual</span>
+                    </button>
+                    <button onclick="exportToPDF()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2 text-xs uppercase" title="Exportar para PDF">
+                        <i class="fa-solid fa-file-pdf text-lg"></i> <span class="hidden md:inline">Exportar PDF</span>
+                    </button>
+                </div>
+                
                 <div class="bg-blue-50 px-6 py-3 rounded-xl border border-blue-100 shadow-inner text-center min-w-[150px]">
                     <p id="scoreLabelHeader" class="text-[10px] font-bold text-blue-400 uppercase text-left">Score Consolidado</p>
                     <span id="finalScoreDisplay" class="text-2xl font-bold text-blue-800">0.00%</span>
@@ -192,7 +199,7 @@
                         
                         <div id="fileStatusContainer" class="mt-6 flex flex-wrap gap-2 justify-center">
                             <div id="excelStatus" class="status-pill bg-slate-100 text-slate-400">Excel Metas: Não detectado</div>
-                            <div id="csvStatus" class="status-pill bg-slate-100 text-slate-400">CSV Vendas: 0 carregados</div>
+                            <div id="csvStatus" class="status-pill bg-slate-100 text-slate-400">Bases Sell Out: 0 carregadas</div>
                         </div>
 
                         <div id="fileList" class="mt-4 flex flex-wrap gap-2 justify-center"></div>
@@ -244,6 +251,56 @@
             <h3 class="text-xl font-bold text-slate-800 mb-4" id="modalTitle">Mensagem</h3>
             <p class="text-slate-600 text-sm mb-8" id="modalMessage"></p>
             <button onclick="closeModal()" class="w-full py-4 bg-slate-900 text-white font-black rounded-2xl shadow-lg hover:bg-black transition-colors">ENTENDI</button>
+        </div>
+    </div>
+
+    <!-- Modal do Manual -->
+    <div id="manualModal" class="fixed inset-0 bg-slate-900/70 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h3 class="text-2xl font-bold text-slate-800"><i class="fa-solid fa-book text-blue-500 mr-2"></i> Manual de Utilização</h3>
+                <button onclick="closeManual()" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            <div class="space-y-6 text-sm text-slate-600 leading-relaxed">
+                
+                <section>
+                    <h4 class="text-lg font-black text-slate-800 mb-2 flex items-center"><i class="fa-solid fa-1 text-blue-500 mr-2"></i> Configurações Iniciais</h4>
+                    <p>Comece por definir o <strong>Período</strong> (Ano e Trimestres) e os filtros (ex: WISP ONLY). Em seguida, introduza os seus <strong>Salários de Referência</strong> para que o sistema calcule automaticamente a sua Base Anual e o Potencial de Bônus (100%).</p>
+                </section>
+
+                <section>
+                    <h4 class="text-lg font-black text-slate-800 mb-2 flex items-center"><i class="fa-solid fa-2 text-blue-500 mr-2"></i> Carregamento de Ficheiros</h4>
+                    <p>Na área central (tracejada), arraste ou clique para adicionar os seus dados:</p>
+                    <ul class="list-disc pl-6 mt-2 space-y-1">
+                        <li><strong>Ficheiro de Metas:</strong> O seu ficheiro Excel oficial com os targets. O sistema vai detetá-lo automaticamente e preencher os objetivos.</li>
+                        <li><strong>Ficheiros de Sell Out:</strong> Podem ser em formato Excel (.xlsx) ou CSV. Adicione as bases de vendas dos meses que pretende analisar.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h4 class="text-lg font-black text-slate-800 mb-2 flex items-center"><i class="fa-solid fa-3 text-orange-500 mr-2"></i> Projeção de Metas (Simulação)</h4>
+                    <p>Quer prever cenários para o ano seguinte? Pode aumentar as metas de duas formas:</p>
+                    <ul class="list-disc pl-6 mt-2 space-y-1">
+                        <li><strong>Global (Em Massa):</strong> Insira um valor na caixa laranja na barra lateral (ex: 30) e clique em "Aplicar Todos".</li>
+                        <li><strong>Individual:</strong> Ao lado de cada meta (na secção Metas e Projeções), introduza um valor na pequena caixa laranja para aumentar apenas aquele KPI específico.</li>
+                    </ul>
+                    <p class="mt-2 text-xs italic font-bold text-slate-400">* Pode clicar em "Limpar Tudo" a qualquer momento para restaurar os valores originais.</p>
+                </section>
+
+                <section>
+                    <h4 class="text-lg font-black text-slate-800 mb-2 flex items-center"><i class="fa-solid fa-4 text-green-500 mr-2"></i> Bônus e Deduções</h4>
+                    <p>Os Itens Auxiliares (Bônus) e as Penalizações começam <strong>desmarcados por predefinição</strong>. Se quiser considerá-los na sua simulação (por exemplo, analisar o impacto de uma penalização ou bônus atingido), basta ativar o interruptor ao lado do nome do indicador.</p>
+                </section>
+
+                <section>
+                    <h4 class="text-lg font-black text-slate-800 mb-2 flex items-center"><i class="fa-solid fa-5 text-red-500 mr-2"></i> Cálculo e Exportação</h4>
+                    <p>Depois de carregar os ficheiros e ajustar as projeções, clique em <strong>CALCULAR RESULTADO</strong>. A tabela mostrará o que foi atingido e o valor líquido a receber. Para guardar um relatório, use o botão vermelho <strong>Exportar PDF</strong> no topo do ecrã.</p>
+                </section>
+
+            </div>
+            <div class="mt-8 border-t pt-6">
+                <button onclick="closeManual()" class="w-full py-4 bg-slate-900 text-white font-black rounded-2xl shadow-lg hover:bg-black transition-colors uppercase tracking-widest text-sm">Fechar Manual</button>
+            </div>
         </div>
     </div>
 
@@ -377,36 +434,56 @@
 
         async function handleFiles(files) {
             for (let file of files) {
-                if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) await readExcelTargets(file);
-                else if (file.name.toLowerCase().endsWith('.csv')) uploadedCSVFiles.push(file);
+                if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+                    await readExcelFile(file);
+                } else if (file.name.toLowerCase().endsWith('.csv')) {
+                    uploadedCSVFiles.push(file);
+                }
             }
             updateFileList();
         }
 
         function updateFileList() {
             document.getElementById('fileList').innerHTML = uploadedCSVFiles.map((f, i) => `<div class="bg-blue-50 px-2 py-1 rounded text-[10px] border flex gap-1 font-bold"><span>${f.name}</span><button onclick="removeCSV(event, ${i})" class="text-red-500">X</button></div>`).join('');
-            document.getElementById('csvStatus').innerText = `CSV Vendas: ${uploadedCSVFiles.length} carregados`;
+            document.getElementById('csvStatus').innerText = `Bases Sell Out: ${uploadedCSVFiles.length} carregadas`;
             document.getElementById('excelStatus').innerText = excelMetaLoaded ? "Excel Metas: Detectado" : "Excel Metas: Não detectado";
             document.getElementById('processBtn').disabled = uploadedCSVFiles.length === 0;
         }
 
-        async function readExcelTargets(file) {
+        async function readExcelFile(file) {
             try {
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1}); 
-                rows.forEach(row => {
-                    const rowText = row.map(v => (v || "")).join(' ').toLowerCase();
-                    const kpi = KPI_DEFS.find(d => d.keys.some(k => rowText.includes(k)));
-                    if (kpi) {
-                        const tEl = document.getElementById(`target_${kpi.id}`);
-                        const nums = row.filter(v => typeof v === 'number').map(n => parseFloat(n)).filter(n => ![2024,2025,2026].includes(n));
-                        let val = kpi.id === 'director' ? 1 : (nums.sort((a,b) => Math.abs(b)-Math.abs(a))[0] || 0);
-                        if (tEl) { tEl.value = val; baselineTargets[kpi.id] = val; }
-                    }
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                // Primeiro lê como array para identificar o tipo de ficheiro
+                const rowsArray = XLSX.utils.sheet_to_json(sheet, {header: 1}); 
+                
+                // Analisa as primeiras 30 linhas para perceber se é a folha de METAS
+                const isTargets = rowsArray.slice(0, 30).some(row => {
+                    const text = row.join(' ').toLowerCase();
+                    return text.includes('provider capillarity') || text.includes('director eval');
                 });
-                excelMetaLoaded = true; updateFileList(); triggerRecalculation();
-            } catch (e) { showModal("Erro", "Erro ao ler Excel."); }
+
+                if (isTargets) {
+                    rowsArray.forEach(row => {
+                        const rowText = row.map(v => (v || "")).join(' ').toLowerCase();
+                        const kpi = KPI_DEFS.find(d => d.keys.some(k => rowText.includes(k)));
+                        if (kpi) {
+                            const tEl = document.getElementById(`target_${kpi.id}`);
+                            const nums = row.filter(v => typeof v === 'number').map(n => parseFloat(n)).filter(n => ![2024,2025,2026].includes(n));
+                            let val = kpi.id === 'director' ? 1 : (nums.sort((a,b) => Math.abs(b)-Math.abs(a))[0] || 0);
+                            if (tEl) { tEl.value = val; baselineTargets[kpi.id] = val; }
+                        }
+                    });
+                    excelMetaLoaded = true; 
+                } else {
+                    // Se não é ficheiro de metas, assume que é BASE DE VENDAS e extrai formatado como texto
+                    const jsonRows = XLSX.utils.sheet_to_json(sheet, {raw: false, defval: ""});
+                    uploadedCSVFiles.push({ name: file.name, isExcelData: true, data: jsonRows });
+                }
+                updateFileList(); triggerRecalculation();
+            } catch (e) { showModal("Erro", "Erro ao processar ficheiro Excel: " + file.name); }
         }
 
         window.removeCSV = (e, i) => { e.stopPropagation(); uploadedCSVFiles.splice(i, 1); updateFileList(); if(!uploadedCSVFiles.length) { rawData=[]; renderTable(); } };
@@ -582,6 +659,9 @@
         }
         function closeModal() { document.getElementById('messageModal').classList.add('hidden'); }
 
+        function openManual() { document.getElementById('manualModal').classList.remove('hidden'); }
+        function closeManual() { document.getElementById('manualModal').classList.add('hidden'); }
+
         function exportToPDF() {
             const element = document.getElementById('mainDashboard');
             const uploadArea = document.getElementById('uploadArea');
@@ -631,11 +711,24 @@
                 btn.onclick = (e) => {
                     e.stopPropagation(); btn.disabled = true; document.getElementById('loadingIndicator')?.classList.remove('hidden');
                     rawData = []; let c = 0;
+                    
+                    if (uploadedCSVFiles.length === 0) {
+                        calculateKPIs();
+                        return;
+                    }
+                    
                     uploadedCSVFiles.forEach(f => {
-                        Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => {
-                            rawData = rawData.concat(res.data);
+                        if (f.isExcelData) {
+                            // Se for ficheiro Excel processado nativamente
+                            rawData = rawData.concat(f.data);
                             if (++c === uploadedCSVFiles.length) calculateKPIs();
-                        }});
+                        } else {
+                            // Se for CSV normal processado via PapaParse
+                            Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => {
+                                rawData = rawData.concat(res.data);
+                                if (++c === uploadedCSVFiles.length) calculateKPIs();
+                            }});
+                        }
                     });
                 };
             }
