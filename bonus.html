@@ -1,17 +1,20 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Score - Sell Out George</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Calculadora de Score - Sell Out</title>
+    <!-- Bibliotecas de Processamento -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
         .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); }
-        .file-drop-area { border: 2px dashed #cbd5e1; transition: all 0.3s ease; }
-        .file-drop-area.dragover { border-color: #3b82f6; background-color: #eff6ff; }
+        .file-drop-area { border: 2px dashed #cbd5e1; transition: all 0.3s ease; cursor: pointer; }
+        .file-drop-area.dragover { border-color: #3b82f6; background-color: #eff6ff; border-style: solid; }
         
         .loader {
             border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%;
@@ -24,32 +27,39 @@
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
 
-        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #3b82f6; }
-        input:checked + .slider:before { transform: translateX(22px); }
+        input:checked + .slider:before { transform: translateX(20px); }
         
         .threshold-alert { background-color: #fff1f2; border: 1px solid #fecaca; }
         .barrier-pill { font-size: 9px; padding: 1px 4px; border-radius: 4px; font-weight: bold; background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+        .status-pill { font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
+        .row-disabled { opacity: 0.35; filter: grayscale(0.8); }
         
-        .salary-helper { border-left: 4px solid #3b82f6; }
+        /* Ocultar elementos ao imprimir/exportar PDF */
+        .pdf-hide { display: none !important; }
     </style>
 </head>
 <body class="text-slate-800 p-4 md:p-8 min-h-screen">
 
-    <div class="max-w-6xl mx-auto space-y-6">
+    <div class="max-w-7xl mx-auto space-y-6" id="mainDashboard">
         
-        <div class="glass-panel p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <!-- Cabeçalho -->
+        <div class="glass-panel p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-200">
             <div>
-                <h1 class="text-2xl font-bold text-slate-800"><i class="fa-solid fa-shield-halved text-blue-500 mr-2"></i> Simulador de Bônus TP-Link</h1>
-                <p class="text-sm text-slate-500 mt-1">Cálculo YTD, Crescimento TOP 20 YoY e Regra de Barreira Q4</p>
+                <h1 class="text-2xl font-bold text-slate-800"><i class="fa-solid fa-shield-halved text-blue-500 mr-2"></i> Simulador de Bônus</h1>
+                <p class="text-sm text-slate-500 mt-1">Gestão de Score Sell Out | Planeamento de Metas 2026</p>
             </div>
             
-            <div class="flex gap-4">
+            <div class="flex gap-4 items-center">
+                <button onclick="exportToPDF()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2 text-xs uppercase" title="Exportar para PDF">
+                    <i class="fa-solid fa-file-pdf text-lg"></i> <span class="hidden md:inline">Exportar PDF</span>
+                </button>
                 <div class="bg-blue-50 px-6 py-3 rounded-xl border border-blue-100 shadow-inner text-center min-w-[150px]">
-                    <p id="scoreLabelHeader" class="text-[10px] font-bold text-blue-400 uppercase text-left">Score do Período</p>
+                    <p id="scoreLabelHeader" class="text-[10px] font-bold text-blue-400 uppercase text-left">Score Consolidado</p>
                     <span id="finalScoreDisplay" class="text-2xl font-bold text-blue-800">0.00%</span>
                 </div>
                 <div class="bg-green-50 px-6 py-3 rounded-xl border border-green-100 shadow-inner text-center min-w-[150px]">
@@ -59,169 +69,160 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
             
-            <div class="space-y-6">
+            <!-- Barra Lateral -->
+            <div class="lg:col-span-1 space-y-6">
                 
-                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Período de Análise</h2>
-                        <div class="flex items-center bg-slate-100 px-2 py-1 rounded-full border border-slate-200">
-                            <span class="text-[10px] font-bold text-slate-500 mr-2">WISP ONLY:</span>
+                <!-- Período -->
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex items-center justify-between mb-4 border-b pb-2">
+                        <h2 class="text-xs font-bold text-slate-700 uppercase">Config. Período</h2>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[9px] font-black text-blue-500 uppercase">WISP ONLY</span>
                             <label class="switch"><input type="checkbox" id="filterWispOnly" checked><span class="slider"></span></label>
                         </div>
                     </div>
-                    
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-2">Trimestres (Múltipla Seleção)</label>
-                            <div class="grid grid-cols-4 gap-2">
-                                <div class="relative">
-                                    <input type="checkbox" id="q1" value="Q1" class="quarter-checkbox hidden peer">
-                                    <label for="q1" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q1</label>
-                                </div>
-                                <div class="relative">
-                                    <input type="checkbox" id="q2" value="Q2" class="quarter-checkbox hidden peer">
-                                    <label for="q2" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q2</label>
-                                </div>
-                                <div class="relative">
-                                    <input type="checkbox" id="q3" value="Q3" class="quarter-checkbox hidden peer" checked>
-                                    <label for="q3" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q3</label>
-                                </div>
-                                <div class="relative">
-                                    <input type="checkbox" id="q4" value="Q4" class="quarter-checkbox hidden peer" checked>
-                                    <label for="q4" class="cursor-pointer flex items-center justify-center py-2.5 border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 peer-checked:bg-blue-600 peer-checked:border-blue-600 peer-checked:text-white transition-all shadow-sm">Q4</label>
-                                </div>
-                            </div>
-                            <div class="flex justify-between mt-2 px-1">
-                                <button type="button" onclick="selectAllQuarters(true)" class="text-[10px] font-bold text-blue-500 hover:text-blue-700 uppercase tracking-wider">Selecionar Todos</button>
-                                <button type="button" onclick="selectAllQuarters(false)" class="text-[10px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider">Limpar</button>
-                            </div>
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <div class="relative">
+                            <input type="checkbox" id="q1" value="Q1" class="quarter-checkbox hidden peer" checked><label for="q1" class="cursor-pointer flex items-center justify-center py-2 border rounded-lg text-xs font-bold peer-checked:bg-blue-600 peer-checked:text-white transition-all">Q1</label>
                         </div>
-
-                        <select id="filterYear" class="w-full bg-slate-50 border p-2 rounded-lg text-sm font-bold outline-none focus:border-blue-500">
-                            <option value="ALL">Analisar base CSV toda</option>
-                            <option value="2023">Ano Atual: 2023</option>
-                            <option value="2024">Ano Atual: 2024</option>
-                            <option value="2025" selected>Ano Atual: 2025</option>
-                            <option value="2026">Ano Atual: 2026</option>
-                        </select>
+                        <div class="relative">
+                            <input type="checkbox" id="q2" value="Q2" class="quarter-checkbox hidden peer"><label for="q2" class="cursor-pointer flex items-center justify-center py-2 border rounded-lg text-xs font-bold peer-checked:bg-blue-600 peer-checked:text-white transition-all">Q2</label>
+                        </div>
+                        <div class="relative">
+                            <input type="checkbox" id="q3" value="Q3" class="quarter-checkbox hidden peer"><label for="q3" class="cursor-pointer flex items-center justify-center py-2 border rounded-lg text-xs font-bold peer-checked:bg-blue-600 peer-checked:text-white transition-all">Q3</label>
+                        </div>
+                        <div class="relative">
+                            <input type="checkbox" id="q4" value="Q4" class="quarter-checkbox hidden peer"><label for="q4" class="cursor-pointer flex items-center justify-center py-2 border rounded-lg text-xs font-bold peer-checked:bg-blue-600 peer-checked:text-white transition-all">Q4</label>
+                        </div>
                     </div>
-
-                    <div id="ruleInfoBox" class="mt-4 p-3 rounded-lg text-[10px] border leading-relaxed"></div>
+                    <select id="filterYear" class="w-full bg-slate-50 border p-2 rounded-lg text-xs font-bold outline-none focus:border-blue-500">
+                        <option value="2025">Ano: 2025</option>
+                        <option value="2026" selected>Ano Atual: 2026</option>
+                    </select>
+                    <div id="ruleInfoBox" class="mt-4 p-3 rounded-lg text-[10px] border bg-slate-50 leading-relaxed"></div>
                 </div>
 
-                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-blue-200 bg-blue-50/20 salary-helper">
-                    <h2 class="text-xs font-black text-blue-700 mb-3 flex items-center"><i class="fa-solid fa-calculator mr-2"></i>Ajudante Pró-rata Salarial</h2>
+                <!-- Simulador de Projeção Global -->
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-orange-200 bg-orange-50/20">
+                    <h2 class="text-xs font-black text-orange-700 mb-3 uppercase flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Projeção Global (Massa)
+                    </h2>
                     <div class="space-y-3">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="text-[9px] font-bold text-slate-400 uppercase">Salário 1 (R$)</label>
-                                <input type="number" id="salary1" value="14000" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
-                            </div>
-                            <div>
-                                <label class="text-[9px] font-bold text-slate-400 uppercase">Meses</label>
-                                <input type="number" id="salary1Months" value="10" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
+                        <div>
+                            <label class="block text-[9px] font-bold text-orange-400 uppercase mb-1">Aumentar todas as metas em:</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="projectionPercent" placeholder="Ex: 30" class="flex-1 p-2 border rounded text-xs font-bold bg-white outline-none">
+                                <span class="flex items-center font-bold text-orange-600">%</span>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="text-[9px] font-bold text-slate-400 uppercase">Salário 2 (R$)</label>
-                                <input type="number" id="salary2" value="14700" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
-                            </div>
-                            <div>
-                                <label class="text-[9px] font-bold text-slate-400 uppercase">Meses</label>
-                                <input type="number" id="salary2Months" value="2" class="w-full p-1.5 border rounded text-xs font-bold bg-white">
-                            </div>
+                            <button onclick="applyProjection()" class="py-2 bg-orange-600 text-white text-[9px] font-black rounded-lg uppercase shadow-sm hover:bg-orange-700 transition-all">Aplicar Todos</button>
+                            <button onclick="resetTargets()" class="py-2 bg-slate-400 text-white text-[9px] font-black rounded-lg uppercase shadow-sm hover:bg-slate-500 transition-all">Limpar Tudo</button>
                         </div>
-                        <button onclick="applySalaryToBonus()" class="w-full py-2 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase shadow-sm hover:bg-blue-700 transition-colors">Aplicar ao Bônus Target</button>
                     </div>
                 </div>
 
-                <div class="glass-panel p-6 rounded-2xl shadow-sm border border-indigo-100 bg-indigo-50/30">
-                    <h2 class="text-sm font-bold text-indigo-800 mb-4 flex items-center"><i class="fa-solid fa-money-bill-trend-up mr-2"></i>Simulador de Pagamento</h2>
+                <!-- Salários -->
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-blue-200 bg-blue-50/20">
+                    <h2 class="text-xs font-black text-blue-700 mb-3 uppercase tracking-tighter">Salário Referência</h2>
                     <div class="space-y-3">
-                        <div>
-                            <label class="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Bônus Anual Target (4 salários)</label>
-                            <div class="relative"><span class="absolute left-3 top-2 text-slate-400 text-sm">R$</span><input type="number" id="bonusPotential" value="56466.67" class="w-full pl-9 p-2 border rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="number" id="salary1" placeholder="Salário 1" class="w-full p-2 border rounded text-xs font-bold bg-white outline-none">
+                            <input type="number" id="salary1Months" placeholder="Meses" class="w-full p-2 border rounded text-xs font-bold bg-white outline-none">
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-red-400 uppercase mb-1">Total Já Pago Anteriormente</label>
-                            <div class="relative"><span class="absolute left-3 top-2 text-slate-400 text-sm">R$</span><input type="number" id="bonusAlreadyPaid" value="15000" class="w-full pl-9 p-2 border rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-red-500"></div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="number" id="salary2" placeholder="Salário 2" class="w-full p-2 border rounded text-xs font-bold bg-white outline-none">
+                            <input type="number" id="salary2Months" placeholder="Meses" class="w-full p-2 border rounded text-xs font-bold bg-white outline-none">
                         </div>
-                    </div>
-                    <div class="mt-4 pt-4 border-t border-indigo-100">
-                        <div class="flex justify-between text-[10px] text-slate-500 uppercase font-bold mb-1"><span>Devido no Período:</span><span id="ytdTotalValue" class="text-slate-700">R$ 0,00</span></div>
-                        <div class="flex justify-between text-sm font-black text-indigo-600"><span>A Receber Líquido:</span><span id="netToPayValue">R$ 0,00</span></div>
+                        <button onclick="applySalaryToBonus()" class="w-full py-2 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase shadow-sm hover:bg-blue-700">Atualizar Financeiro</button>
                     </div>
                 </div>
 
-                <div class="glass-panel p-6 rounded-2xl shadow-sm">
-                    <h2 class="text-sm font-bold text-slate-700 mb-4 border-b pb-2 flex items-center justify-between">Configuração de Metas</h2>
-                    <div class="mb-5">
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Base das Metas Inseridas Abaixo</label>
-                        <select id="targetBasePeriod" class="w-full bg-white border p-2 rounded-lg text-xs font-black outline-none">
-                            <option value="1">Os valores são Trimestrais (1Q)</option>
-                            <option value="2" selected>Os valores são Semestrais (H)</option>
-                            <option value="4">Os valores são Anuais (4Q)</option>
-                        </select>
+                <!-- Financeiro -->
+                <div class="glass-panel p-5 rounded-2xl shadow-sm border border-indigo-100 bg-indigo-50/30">
+                    <h2 class="text-xs font-bold text-indigo-800 mb-3 uppercase text-center">Resumo de Bônus</h2>
+                    <div class="space-y-3">
+                        <label class="block text-[9px] font-bold text-indigo-400 uppercase mb-1">Potencial Anual (100%)</label>
+                        <input type="number" id="bonusPotential" placeholder="0,00" class="w-full p-2 border rounded-lg text-sm font-bold bg-white mb-2">
+                        <label class="block text-[9px] font-bold text-red-400 uppercase mb-1">Total Adiantado</label>
+                        <input type="number" id="bonusAlreadyPaid" placeholder="0,00" class="w-full p-2 border rounded-lg text-sm font-bold bg-white">
                     </div>
-                    <div class="space-y-3" id="targetsForm">
-                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">Provider Capillarity <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetCapillarity" value="2021" class="border rounded p-1.5 text-sm font-bold target-input"></div>
-                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">Total Revenue (R$) <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" step="0.01" id="targetTotalRev" value="31991478.83" class="border rounded p-1.5 text-sm font-bold target-input"></div>
-                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">ENBU Revenue (R$) <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" step="0.01" id="targetEnbuRev" value="1749158.91" class="border rounded p-1.5 text-sm font-bold target-input"></div>
-                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">Router Vol. <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetWifi6Router" value="81486" class="border rounded p-1.5 text-sm font-bold target-input"></div>
-                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">ONT Vol. <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetWifi6Ont" value="29478" class="border rounded p-1.5 text-sm font-bold target-input"></div>
-                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase flex justify-between">OLT Product <span class="barrier-pill">BARREIRA 80%</span></label><input type="number" id="targetOlt" value="79" class="border rounded p-1.5 text-sm font-bold target-input"></div>
-                        
-                        <div class="p-3 bg-blue-50 border border-blue-100 rounded-xl space-y-2">
-                            <label class="text-[10px] font-bold text-blue-600 uppercase flex justify-between items-center">TOP 20 Growth (YoY) <span class="barrier-pill">BARREIRA 80%</span></label>
-                            <input type="number" id="targetTop20" value="5000000" class="border rounded p-1.5 w-full text-xs font-bold target-input" title="Meta de Crescimento em Reais (R$) para os TOP 20">
-                            <input type="number" id="achieveTop20" value="0" class="border rounded p-1.5 w-full text-xs font-bold target-input bg-white text-blue-700" title="Digite o override manual se desejar. Se 0, calcula Crescimento YoY automático.">
-                            <p class="text-[8px] text-blue-400 leading-tight italic">Crescimento Automático: (Vendas Top 20 Atual - Vendas Top 20 Ano Anterior).</p>
-                        </div>
+                </div>
 
-                        <div class="flex flex-col"><label class="text-[10px] font-bold text-slate-500 uppercase">Director Eval (0.0 - 1.0)</label><input type="number" step="0.1" id="targetDirector" value="1" class="border rounded p-1.5 text-sm font-bold"></div>
+                <!-- Metas Dinâmicas -->
+                <div class="glass-panel p-5 rounded-2xl shadow-sm bg-white border border-slate-200">
+                    <h2 class="text-xs font-black text-slate-700 mb-4 border-b pb-2 uppercase text-center">Metas e Projeções</h2>
+                    <div id="targetsForm" class="space-y-4 text-[10px]">
+                        <div class="flex flex-col mb-4"><label class="font-bold text-slate-400 uppercase mb-1">Base Período (Excel)</label>
+                            <select id="targetBasePeriod" class="w-full border p-1 rounded font-bold bg-slate-50">
+                                <option value="1">Trimestral (1Q)</option>
+                                <option value="2" selected>Semestral (2Q)</option>
+                                <option value="4">Anual (4Q)</option>
+                            </select>
+                        </div>
+                        <div class="space-y-2" id="dynamicTargetsInputs">
+                             <p class="text-slate-400 italic text-center">Carregue o Excel de KPIs...</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="lg:col-span-2 space-y-6">
+            <!-- Centro -->
+            <div class="lg:col-span-3 space-y-6">
                 
                 <div class="glass-panel p-6 rounded-2xl shadow-sm overflow-hidden bg-white border border-slate-200">
                     <div class="flex justify-between items-center mb-6">
-                        <h2 id="tableTitle" class="text-lg font-bold text-slate-800">Cálculo de Score do Período</h2>
-                        <div id="loadingIndicator" class="hidden flex items-center text-blue-600 font-medium text-xs">
-                            <div class="loader mr-2 !w-3 !h-3"></div> Analisando bases...
+                        <h2 class="text-lg font-bold text-slate-800">Relatório de Simulação</h2>
+                        <div id="loadingIndicator" class="hidden flex items-center text-blue-600 font-bold text-xs bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200">
+                            <div class="loader mr-2 !w-3 !h-3"></div> <span id="loadingText">A calcular...</span>
                         </div>
                     </div>
 
-                    <div class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 mb-8 text-center transition-colors hover:bg-slate-100" id="uploadArea">
-                        <div id="dropZone" class="cursor-pointer">
-                            <i class="fa-solid fa-cloud-arrow-up text-4xl text-blue-400 mb-3"></i>
-                            <p class="text-sm font-bold text-slate-700">Importe os ficheiros CSV (Sell Out)</p>
-                            <input type="file" id="csvFileInput" class="hidden" multiple accept=".csv">
+                    <!-- Área de Upload -->
+                    <div class="border-2 border-dashed border-slate-200 rounded-2xl p-12 mb-8 text-center transition-all hover:bg-slate-50 group" id="uploadArea">
+                        <div id="dropZoneContainer">
+                            <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100 group-hover:scale-105 transition-transform">
+                                <i class="fa-solid fa-cloud-arrow-up text-2xl text-blue-600"></i>
+                            </div>
+                            <p class="text-lg font-bold text-slate-700">Clique ou arraste os ficheiros Excel e CSV aqui</p>
+                            <p class="text-sm text-slate-400 mt-1">Carregue a folha de <strong>Metas</strong> e as <strong>Bases Sell Out</strong>.</p>
                         </div>
-                        <div id="fileList" class="mt-6 flex flex-wrap gap-2 justify-center"></div>
-                        <button id="processBtn" class="mt-8 bg-slate-800 hover:bg-black text-white font-black py-3 px-10 rounded-xl shadow-lg disabled:opacity-30 transition-all" disabled>PROCESSAR E CALCULAR</button>
+                        
+                        <div id="fileStatusContainer" class="mt-6 flex flex-wrap gap-2 justify-center">
+                            <div id="excelStatus" class="status-pill bg-slate-100 text-slate-400">Excel Metas: Não detectado</div>
+                            <div id="csvStatus" class="status-pill bg-slate-100 text-slate-400">CSV Vendas: 0 carregados</div>
+                        </div>
+
+                        <div id="fileList" class="mt-4 flex flex-wrap gap-2 justify-center"></div>
+                        <input type="file" id="csvFileInput" class="hidden" multiple accept=".csv,.xlsx,.xls">
+                        
+                        <button id="processBtn" class="mt-8 bg-slate-900 hover:bg-black text-white font-black py-4 px-16 rounded-2xl shadow-xl disabled:opacity-30 transition-all uppercase tracking-widest text-sm" disabled>CALCULAR RESULTADO</button>
                     </div>
 
+                    <!-- Tabela Principal -->
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
+                        <table class="w-full text-sm text-left border-collapse">
                             <thead>
-                                <tr class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black">
-                                    <th class="px-4 py-4 border-b">KPI Item</th>
-                                    <th class="px-4 py-4 border-b text-right">Meta Proporcional</th>
-                                    <th class="px-4 py-4 border-b text-right">Real Alcançado</th>
-                                    <th class="px-4 py-4 border-b text-center">% Ating.</th>
-                                    <th class="px-4 py-4 border-b text-right">Score Parcial</th>
+                                <tr class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black border-y">
+                                    <th class="px-4 py-4">KPI Item</th>
+                                    <th class="px-4 py-4 text-right">Ratio</th>
+                                    <th class="px-4 py-4 text-right">Meta (Simulada)</th>
+                                    <th class="px-4 py-4 text-right">Realizado</th>
+                                    <th class="px-4 py-4 text-center">% Ating.</th>
+                                    <th class="px-4 py-4 text-right">Score</th>
                                 </tr>
                             </thead>
-                            <tbody id="resultsTableBody" class="divide-y divide-slate-100"></tbody>
-                            <tfoot class="bg-blue-50 font-black border-t-2">
+                            <tbody id="resultsTableBody" class="divide-y divide-slate-100 text-[11px]">
                                 <tr>
-                                    <td id="footerLabel" class="px-4 py-5" colspan="4">Score do Período Selecionado</td>
-                                    <td class="px-4 py-5 text-right text-xl text-blue-700" id="totalScoreCell">0.00%</td>
+                                    <td colspan="6" class="py-16 text-center text-slate-300 italic">Insira os ficheiros para visualizar a análise...</td>
+                                </tr>
+                            </tbody>
+                            <tfoot class="bg-blue-50 font-black border-t-2 border-blue-200">
+                                <tr>
+                                    <td id="footerLabel" class="px-4 py-5" colspan="5">Score Final Projetado (YTD)</td>
+                                    <td class="px-4 py-5 text-right text-2xl text-blue-700" id="totalScoreCell">0.00%</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -229,280 +230,426 @@
                 </div>
 
                 <div class="glass-panel p-6 rounded-2xl shadow-sm bg-white border border-slate-200">
-                    <h2 class="text-sm font-bold text-slate-700 mb-6 flex items-center tracking-widest uppercase"><i class="fa-solid fa-users mr-3 text-blue-400"></i>Capilaridade Mensal Única</h2>
-                    <div id="monthlyBreakdownContainer" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+                    <h2 class="text-sm font-bold text-slate-700 mb-4 flex items-center uppercase tracking-widest"><i class="fa-solid fa-users mr-3 text-blue-400"></i>Capilaridade Mensal Única (WISP)</h2>
+                    <div id="monthlyBreakdownContainer" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
                 </div>
 
             </div>
         </div>
     </div>
 
+    <!-- Modal -->
     <div id="messageModal" class="fixed inset-0 bg-slate-900/70 hidden flex items-center justify-center z-50 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center">
-            <h3 class="text-xl font-bold text-slate-800 mb-6" id="modalMessage">Info</h3>
-            <button onclick="closeModal()" class="w-full py-4 bg-slate-900 text-white font-black rounded-2xl">ENTENDI</button>
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl text-center border border-slate-200">
+            <h3 class="text-xl font-bold text-slate-800 mb-4" id="modalTitle">Mensagem</h3>
+            <p class="text-slate-600 text-sm mb-8" id="modalMessage"></p>
+            <button onclick="closeModal()" class="w-full py-4 bg-slate-900 text-white font-black rounded-2xl shadow-lg hover:bg-black transition-colors">ENTENDI</button>
         </div>
     </div>
 
     <script>
-        let uploadedFiles = [];
+        let uploadedCSVFiles = [];
         let rawData = [];
+        let excelMetaLoaded = false;
+        let baselineTargets = {}; 
+        let currentResults = {}; // Memória Cache para performance
         
-        const KPI_CONFIG = [
-            { id: 'capillarity', name: 'Provider Capillarity', ratio: 0.30, maxRemark: 1.2, isInt: true, hasFloor: true },
-            { id: 'totalRev', name: 'Total Revenue', ratio: 0.20, maxRemark: 1.2, isCurrency: true, hasFloor: true },
-            { id: 'enbuRev', name: 'ENBU Revenue', ratio: 0.10, maxRemark: 1.2, isCurrency: true, hasFloor: true },
-            { id: 'top20', name: 'TOP 20 Customers Growth', ratio: 0.10, maxRemark: 1.2, isCurrency: true, hasFloor: true },
-            { id: 'wifi6Router', name: 'Wi-Fi 6 & 7 Router Vol', ratio: 0.05, maxRemark: 1.2, isInt: true, hasFloor: true },
-            { id: 'wifi6Ont', name: 'Wi-Fi 6 & 7 ONT Vol', ratio: 0.05, maxRemark: 1.2, isInt: true, hasFloor: true },
-            { id: 'olt', name: 'OLT Product Volume', ratio: 0.05, maxRemark: 1.2, isInt: true, hasFloor: true },
-            { id: 'tauc', name: 'TAUC Sales', ratio: 0.05, maxRemark: 1.2, isAutoHit: true },
-            { id: 'director', name: 'Director Eval', ratio: 0.10, maxRemark: 1.0, isFixedScale: true }
+        const KPI_DEFS = [
+            { id: 'capillarity', keys: ['provider capillarity'], name: 'Provider Capillarity', ratio: 0.30, isInt: true, hasFloor: true, group: 'base' },
+            { id: 'totalRev', keys: ['total revenue'], name: 'Total Revenue', ratio: 0.20, isCurrency: true, hasFloor: true, group: 'base' },
+            { id: 'enbuRev', keys: ['enbu revenue'], name: 'ENBU Revenue', ratio: 0.10, isCurrency: true, hasFloor: true, group: 'base' },
+            { id: 'routerVol', keys: ['router total sales'], name: 'Router Sales Volume', ratio: 0.10, isInt: true, hasFloor: true, group: 'base' },
+            { id: 'ontVol', keys: ['ont total sales'], name: 'ONT Sales Volume', ratio: 0.10, isInt: true, hasFloor: true, group: 'base' },
+            { id: 'tauc', keys: ['tauc sales'], name: 'TAUC Sales Volume', ratio: 0.05, isInt: true, isAutoHit: true, group: 'base' },
+            { id: 'oltVol', keys: ['olt product total'], name: 'OLT Product Volume', ratio: 0.05, isInt: true, hasFloor: true, group: 'base' },
+            { id: 'director', keys: ['director evaluation', 'director eval'], name: 'Director Evaluation', ratio: 0.10, isFixedScale: true, group: 'base' },
+            { id: 'oltBreak', keys: ['olt breakthrough'], name: 'OLT Breakthrough (>10 pcs)', ratio: 0.05, isInt: true, group: 'positive' },
+            { id: 'tapoBreak', keys: ['tapo breakthrough'], name: 'Tapo Breakthrough (>500 pcs)', ratio: 0.05, isInt: true, group: 'positive' },
+            { id: 'vigiBreak', keys: ['vigi breakthrough'], name: 'VIGI Breakthrough (>500 pcs)', ratio: 0.05, isInt: true, group: 'positive' },
+            { id: 'stockQ3', keys: ['stock clearance'], name: 'Stock Clearance (+10%)', ratio: 0.03, isInt: true, group: 'positive' },
+            { id: 'marketInfo', keys: ['market info collection'], name: 'Market Info Collection', ratio: -0.03, isFixedScale: true, group: 'negative' },
+            { id: 'newProd', keys: ['new product introduction'], name: 'New Product Introduction', ratio: -0.03, isFixedScale: true, group: 'negative' }
         ];
+
+        function initTargetsUI() {
+            const div = document.getElementById('dynamicTargetsInputs');
+            if (!div) return;
+            let html = '';
+            const groupsConfig = [
+                { id: 'base', title: 'KPIs Base', colorClass: 'text-slate-700 bg-slate-100' },
+                { id: 'positive', title: 'Itens de Bônus', colorClass: 'text-green-700 bg-green-50' },
+                { id: 'negative', title: 'Itens de Dedução', colorClass: 'text-red-700 bg-red-50' }
+            ];
+            groupsConfig.forEach(g => {
+                const groupKPIs = KPI_DEFS.filter(k => k.group === g.id);
+                if(groupKPIs.length === 0) return;
+
+                html += `<h3 class="text-[10px] font-black ${g.colorClass} p-2 rounded mt-4 mb-2 uppercase text-center border border-slate-200">${g.title}</h3>`;
+                html += groupKPIs.map(kpi => `
+                    <div class="flex flex-col gap-1 mb-3 bg-slate-50/50 p-2 rounded-lg border border-slate-100">
+                        <div class="flex justify-between items-center px-1 mb-1">
+                            <span class="text-[9px] font-bold text-slate-600 uppercase truncate pr-1">${kpi.name} ${kpi.hasFloor ? '<span class="barrier-pill ml-1">80%</span>' : ''}</span>
+                            ${kpi.group !== 'base' ? `
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[8px] font-black text-slate-400 uppercase">Considerar</span>
+                                <label class="switch scale-[0.65] origin-right">
+                                    <input type="checkbox" id="enable_${kpi.id}" onchange="triggerRenderOnly()">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="flex gap-1 items-center">
+                            <input type="number" id="ratio_${kpi.id}" value="${kpi.ratio * 100}" class="w-10 p-1 border rounded text-[9px] font-bold bg-white shadow-inner" title="Peso %" onchange="triggerRenderOnly()">
+                            <input type="number" id="target_${kpi.id}" placeholder="Meta" class="flex-1 p-1 border rounded text-[10px] font-black target-input bg-white shadow-sm" onchange="updateBaseline('${kpi.id}'); triggerRenderOnly()">
+                            <div class="flex items-center gap-0.5 bg-orange-50 border border-orange-100 rounded px-1">
+                                <input type="number" id="proj_val_${kpi.id}" placeholder="0" class="w-8 p-1 bg-transparent text-[10px] font-bold text-orange-600 outline-none text-center" onchange="applyIndividualProj('${kpi.id}')">
+                                <span class="text-[8px] font-bold text-orange-400">%</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            });
+            div.innerHTML = html;
+        }
+
+        function updateBaseline(id) {
+            const val = parseFloat(document.getElementById(`target_${id}`).value) || 0;
+            const projPerc = parseFloat(document.getElementById(`proj_val_${id}`).value) || 0;
+            baselineTargets[id] = projPerc !== 0 ? val / (1 + (projPerc / 100)) : val;
+        }
+
+        function applyIndividualProj(id, skipRender = false) {
+            const kpi = KPI_DEFS.find(k => k.id === id);
+            const projPerc = parseFloat(document.getElementById(`proj_val_${id}`).value) || 0;
+            if (!(id in baselineTargets)) baselineTargets[id] = parseFloat(document.getElementById(`target_${id}`).value) || 0;
+            if (!kpi.isFixedScale && id !== 'stockQ3') {
+                const newVal = baselineTargets[id] * (1 + (projPerc / 100));
+                document.getElementById(`target_${id}`).value = kpi.isInt ? Math.round(newVal) : newVal.toFixed(2);
+            }
+            if (!skipRender) triggerRenderOnly();
+        }
+
+        function applyProjection() {
+            const perc = parseFloat(document.getElementById('projectionPercent').value);
+            if (isNaN(perc)) return showModal("Aviso", "Insira um valor percentual.");
+            KPI_DEFS.forEach(kpi => {
+                if (!kpi.isFixedScale && kpi.id !== 'stockQ3') {
+                    document.getElementById(`proj_val_${kpi.id}`).value = perc;
+                    applyIndividualProj(kpi.id, true);
+                }
+            });
+            triggerRenderOnly(); // Atualiza apenas a tabela uma vez no final!
+        }
+
+        function resetTargets() {
+            KPI_DEFS.forEach(kpi => {
+                if (kpi.id in baselineTargets) {
+                    document.getElementById(`target_${kpi.id}`).value = baselineTargets[kpi.id];
+                    document.getElementById(`proj_val_${kpi.id}`).value = '';
+                }
+            });
+            document.getElementById('projectionPercent').value = '';
+            triggerRenderOnly();
+        }
 
         const formatBRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
         const formatNum = (v) => new Intl.NumberFormat('pt-BR').format(v);
         const formatPct = (v) => (v * 100).toFixed(2) + '%';
 
-        const filterWispOnly = document.getElementById('filterWispOnly');
-        const filterYear = document.getElementById('filterYear');
-        const quarterCheckboxes = document.querySelectorAll('.quarter-checkbox');
-        const bonusPotentialInput = document.getElementById('bonusPotential');
-        const bonusAlreadyPaidInput = document.getElementById('bonusAlreadyPaid');
-        const targetBasePeriodSelect = document.getElementById('targetBasePeriod');
-
-        window.selectAllQuarters = function(state) {
-            quarterCheckboxes.forEach(cb => cb.checked = state);
-            triggerRecalculation();
-        }
-
-        window.applySalaryToBonus = function() {
-            const s1 = parseFloat(document.getElementById('salary1').value) || 0;
-            const m1 = parseFloat(document.getElementById('salary1Months').value) || 0;
-            const s2 = parseFloat(document.getElementById('salary2').value) || 0;
-            const m2 = parseFloat(document.getElementById('salary2Months').value) || 0;
-            const weightedAnnualPotential = ((s1 * m1) + (s2 * m2)) / (m1 + m2) * 4;
-            bonusPotentialInput.value = weightedAnnualPotential.toFixed(2);
-            showModal("Bônus anual target atualizado para " + formatBRL(weightedAnnualPotential));
-            triggerRecalculation();
-        };
-
-        function getSelectedQuarters() { return Array.from(quarterCheckboxes).filter(cb => cb.checked).map(cb => cb.value); }
-        function getScale() { 
-            const count = getSelectedQuarters().length; 
-            const divisor = parseInt(targetBasePeriodSelect.value) || 2;
-            return count > 0 ? count / divisor : 0;
+        function applySalaryToBonus() {
+            const s1 = parseFloat(document.getElementById('salary1')?.value) || 0;
+            const m1 = parseFloat(document.getElementById('salary1Months')?.value) || 0;
+            const s2 = parseFloat(document.getElementById('salary2')?.value) || 0;
+            const m2 = parseFloat(document.getElementById('salary2Months')?.value) || 0;
+            const weighted = (m1 + m2 > 0) ? (((s1 * m1) + (s2 * m2)) / (m1 + m2) * 4) : 0;
+            if (document.getElementById('bonusPotential')) document.getElementById('bonusPotential').value = weighted.toFixed(2);
+            triggerRenderOnly();
         }
 
         function triggerRecalculation() {
-            updateLabels();
             if (rawData.length > 0) calculateKPIs(); else renderTable();
         }
+        
+        function triggerRenderOnly() {
+            if (rawData.length > 0) renderTable(currentResults); else renderTable();
+        }
 
-        function updateLabels() {
-            const qs = getSelectedQuarters();
-            const hasQ4 = qs.includes("Q4");
-            const box = document.getElementById('ruleInfoBox');
-            const scoreLabel = document.getElementById('scoreLabelHeader');
-            const footerLabel = document.getElementById('footerLabel');
-            const tableTitle = document.getElementById('tableTitle');
-
-            let labelText = "Score do Período";
-            if (qs.length === 1) labelText = "Score (" + qs[0] + ")";
-            else if (qs.length === 2 && qs.includes("Q1") && qs.includes("Q2")) labelText = "Score do H1";
-            else if (qs.length === 2 && qs.includes("Q3") && qs.includes("Q4")) labelText = "Score do H2";
-            else if (qs.length === 4) labelText = "Score Anual";
-            else if (qs.length > 0) labelText = "Score (" + qs.join("+") + ")";
-
-            if (scoreLabel) scoreLabel.innerText = labelText;
-            if (footerLabel) footerLabel.innerText = labelText;
-            if (tableTitle) tableTitle.innerText = "Detalhamento: " + labelText;
-
-            if (box) {
-                if (hasQ4) {
-                    box.className = "mt-4 p-3 rounded-lg text-[10px] bg-red-50 text-red-700 border-red-200 font-bold shadow-sm";
-                    box.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> BARREIRA ATIVA: Abaixo de 80% = Score 0.`;
-                } else {
-                    box.className = "mt-4 p-3 rounded-lg text-[10px] bg-slate-50 text-slate-500 border border-dashed";
-                    box.innerHTML = `<i class="fa-solid fa-circle-info text-blue-400 mr-1"></i> A regra de barreira (80%) aplica-se apenas no Q4.`;
-                }
+        async function handleFiles(files) {
+            for (let file of files) {
+                if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) await readExcelTargets(file);
+                else if (file.name.toLowerCase().endsWith('.csv')) uploadedCSVFiles.push(file);
             }
+            updateFileList();
         }
 
-        [filterWispOnly, filterYear, bonusPotentialInput, bonusAlreadyPaidInput, targetBasePeriodSelect].forEach(el => el && (el.onchange = triggerRecalculation));
-        quarterCheckboxes.forEach(cb => cb.addEventListener('change', triggerRecalculation));
-        document.querySelectorAll('.target-input').forEach(el => el.oninput = triggerRecalculation);
-
-        document.getElementById('dropZone').onclick = () => document.getElementById('csvFileInput').click();
-        document.getElementById('csvFileInput').onchange = (e) => handleFiles(e.target.files);
-
-        function handleFiles(files) {
-            for(let f of files) if(f.name.endsWith('.csv')) uploadedFiles.push(f);
-            document.getElementById('fileList').innerHTML = uploadedFiles.map((f, i) => `<div class="bg-blue-50 px-3 py-1.5 rounded-lg text-[10px] border flex gap-2 items-center font-bold shadow-sm text-blue-800"><span>${f.name}</span><button onclick="removeFile(${i})" class="text-red-500"><i class="fa-solid fa-xmark"></i></button></div>`).join('');
-            document.getElementById('processBtn').disabled = uploadedFiles.length === 0;
+        function updateFileList() {
+            document.getElementById('fileList').innerHTML = uploadedCSVFiles.map((f, i) => `<div class="bg-blue-50 px-2 py-1 rounded text-[10px] border flex gap-1 font-bold"><span>${f.name}</span><button onclick="removeCSV(event, ${i})" class="text-red-500">X</button></div>`).join('');
+            document.getElementById('csvStatus').innerText = `CSV Vendas: ${uploadedCSVFiles.length} carregados`;
+            document.getElementById('excelStatus').innerText = excelMetaLoaded ? "Excel Metas: Detectado" : "Excel Metas: Não detectado";
+            document.getElementById('processBtn').disabled = uploadedCSVFiles.length === 0;
         }
 
-        window.removeFile = (i) => { uploadedFiles.splice(i, 1); handleFiles([]); if(!uploadedFiles.length) { rawData=[]; renderTable(); } };
+        async function readExcelTargets(file) {
+            try {
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1}); 
+                rows.forEach(row => {
+                    const rowText = row.map(v => (v || "")).join(' ').toLowerCase();
+                    const kpi = KPI_DEFS.find(d => d.keys.some(k => rowText.includes(k)));
+                    if (kpi) {
+                        const tEl = document.getElementById(`target_${kpi.id}`);
+                        const nums = row.filter(v => typeof v === 'number').map(n => parseFloat(n)).filter(n => ![2024,2025,2026].includes(n));
+                        let val = kpi.id === 'director' ? 1 : (nums.sort((a,b) => Math.abs(b)-Math.abs(a))[0] || 0);
+                        if (tEl) { tEl.value = val; baselineTargets[kpi.id] = val; }
+                    }
+                });
+                excelMetaLoaded = true; updateFileList(); triggerRecalculation();
+            } catch (e) { showModal("Erro", "Erro ao ler Excel."); }
+        }
 
-        document.getElementById('processBtn').onclick = () => {
-            document.getElementById('processBtn').disabled = true; document.getElementById('loadingIndicator').classList.remove('hidden');
-            rawData = []; let count = 0;
-            uploadedFiles.forEach(f => {
-                Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => {
-                    rawData = rawData.concat(res.data);
-                    if (++count === uploadedFiles.length) { calculateKPIs(); document.getElementById('processBtn').disabled = false; document.getElementById('loadingIndicator').classList.add('hidden'); }
-                }});
-            });
-        };
+        window.removeCSV = (e, i) => { e.stopPropagation(); uploadedCSVFiles.splice(i, 1); updateFileList(); if(!uploadedCSVFiles.length) { rawData=[]; renderTable(); } };
+
+        function getVal(row, keys) {
+            const rKeys = Object.keys(row);
+            const found = rKeys.find(k => keys.some(key => k.toLowerCase().trim().replace(/[^a-z0-9]/g,'').includes(key.replace(/[^a-z0-9]/g,''))));
+            return found ? row[found] : null;
+        }
+
+        function parseBRNum(val) {
+            if (!val) return 0;
+            if (typeof val === 'number') return val;
+            let s = val.toString().replace(/[R$\s]/gi, '');
+            if (s.match(/\.\d{3}/) && s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+            else if (s.includes(',')) s = s.replace(',', '.');
+            return parseFloat(s) || 0;
+        }
 
         function calculateKPIs() {
-            const results = { capillarity: 0, totalRev: 0, enbuRev: 0, wifi6Router: 0, wifi6Ont: 0, olt: 0, tauc: 0, top20: 0, director: parseFloat(document.getElementById('targetDirector').value) || 1 };
-            const qs = getSelectedQuarters();
-            const y = filterYear.value;
-            const wispOnly = filterWispOnly.checked;
+            const loader = document.getElementById('loadingIndicator');
+            const results = { totalRev: 0, enbuRev: 0, capillarity: 0, routerVol: 0, ontVol: 0, tauc: 0, oltVol: 0, oltBreak: 0, tapoBreak: 0, vigiBreak: 0, stockQ3: 0, director: 1 };
             
-            const previousYearStr = y !== "ALL" ? (parseInt(y) - 1).toString() : null;
+            try {
+                const qs = Array.from(document.querySelectorAll('.quarter-checkbox')).filter(cb => cb.checked).map(cb => cb.value);
+                const year = document.getElementById('filterYear')?.value || "2025";
+                const wisp = document.getElementById('filterWispOnly')?.checked;
+                const breakOltMap = {}; const breakTapoMap = {}; const breakVigiMap = {};
+                const monthlyProviders = {};
+                let vS1=0, vS2=0, vS3=0, vS4=0;
 
-            const monthlyProviders = {};
-            const customerRevenue = {};     
-            const customerRevenuePrev = {}; 
+                rawData.forEach(row => {
+                    let rQ = (getVal(row, ['quarter', 'trimestre']) || "").toString().toUpperCase();
+                    let rY = (getVal(row, ['year', 'ano']) || "").toString();
+                    if (rQ.includes('1')) rQ = 'Q1'; if (rQ.includes('2')) rQ = 'Q2'; if (rQ.includes('3')) rQ = 'Q3'; if (rQ.includes('4')) rQ = 'Q4';
 
-            rawData.forEach(row => {
-                const rQ = (row['Quarter'] || '').trim().toUpperCase();
-                const rY = (row['Year'] || '').trim();
-                
-                if (qs.length > 0 && !qs.includes(rQ)) return;
-                
-                const isCurrentYear = (y === "ALL" || rY === y);
-                const isPreviousYear = (y !== "ALL" && rY === previousYearStr);
+                    let isWisp = !wisp;
+                    if (wisp) {
+                        const recat = (getVal(row, ['recategorizacao', 'recat', 'category', 'segmento']) || "").toString().toUpperCase();
+                        const cN = (getVal(row, ['customer', 'cliente']) || "").toString().toUpperCase();
+                        isWisp = recat.includes('WISP') || cN.includes('WISP') || Object.values(row).some(v => (v||"").toString().toUpperCase().includes('WISP'));
+                    }
+                    if (!isWisp) return;
 
-                if (!isCurrentYear && !isPreviousYear) return;
+                    const amt = parseBRNum(getVal(row, ['amount', 'valor', 'total', 'faturamento']));
+                    const qty = parseBRNum(getVal(row, ['qty', 'qtde', 'quantidade', 'volume']));
+                    const mod = [getVal(row, ['category','categoria']), getVal(row, ['standard','modelo']), getVal(row, ['item','descrição'])].join(' ').toLowerCase();
+                    const cust = (getVal(row, ['cnpj', 'customer', 'cliente']) || "X").toString().trim();
 
-                const recat = (row['Recategorização'] || '').trim().toUpperCase();
-                const custType = (row['Customer Type'] || '').trim().toUpperCase();
-                if (wispOnly && !recat.includes('WISP') && !custType.includes('WISP')) return;
-
-                const amt = parseFloat(row['Amount']) || 0;
-                const qty = parseInt(row['Qty']) || 0;
-                const type = (row['Type'] || '').trim();
-                const sub = (row['subcategory'] || '').trim();
-                const std = (row['Standard'] || '').trim();
-                const category = (row['category'] || '').trim();
-                const custKey = (row['cnpj'] || row['customer'] || 'Unknown').trim();
-
-                if (isCurrentYear) {
-                    results.totalRev += amt;
-                    if (type === 'Enterprise Networking') results.enbuRev += amt;
-                    customerRevenue[custKey] = (customerRevenue[custKey] || 0) + amt;
-
-                    if (recat === 'WISP-PROVIDER' || custType === 'WISP-PROVIDER') {
-                        const mNum = parseInt(row['Month']) || 0;
-                        const key = `${rY}-${mNum || 'X'}`;
-                        if (!monthlyProviders[key]) monthlyProviders[key] = new Set();
-                        if (row['cnpj']) monthlyProviders[key].add(row['cnpj']);
+                    if (rY === year && (mod.includes('ex511') || mod.includes('ex220') || mod.includes('ec225'))) {
+                        if (rQ === 'Q1') vS1 += qty; else if (rQ === 'Q2') vS2 += qty; else if (rQ === 'Q3') vS3 += qty; else if (rQ === 'Q4') vS4 += qty;
                     }
 
-                    const spbu = (row['Use of Order Placing'] || '').trim() === 'Service Provider' || category === 'Aginet';
-                    if (spbu && (/EX/i.test(std) || /Wi-Fi (6|7)/i.test(sub))) { if (sub.includes('Router') || std.includes('EX')) results.wifi6Router += qty; }
-                    if (spbu && (sub === 'HGU' || /XC|XZ/i.test(std))) { if (/XX|XZ/i.test(std) || sub.includes('Wi-Fi 6') || sub === 'HGU') results.wifi6Ont += qty; }
-                    if (/(OLT|Service Board)/i.test(std + sub + category)) results.olt += qty;
-                }
-
-                if (isPreviousYear) {
-                    customerRevenuePrev[custKey] = (customerRevenuePrev[custKey] || 0) + amt;
-                }
-            });
-
-            // TOP 20 Growth YoY
-            const manualTop20 = parseFloat(document.getElementById('achieveTop20').value) || 0;
-            if (manualTop20 !== 0) {
-                results.top20 = manualTop20;
-            } else if (y !== "ALL") {
-                const sortedRevKeys = Object.keys(customerRevenue).sort((a,b) => customerRevenue[b] - customerRevenue[a]);
-                const top20Keys = sortedRevKeys.slice(0, 20);
-                let currTotal = 0; let prevTotal = 0;
-                top20Keys.forEach(k => {
-                    currTotal += customerRevenue[k];
-                    prevTotal += (customerRevenuePrev[k] || 0);
+                    if (rY === year && qs.includes(rQ)) {
+                        results.totalRev += amt;
+                        const bu = (getVal(row, ['type', 'bu']) || "").toString().toUpperCase();
+                        if (bu.includes('ENTERPRISE') || bu.includes('ENBU') || mod.includes('omada') || mod.includes('pharos')) results.enbuRev += amt;
+                        if (/\b(ex|eb)\d+/i.test(mod)) results.routerVol += qty;
+                        if (/\b(xx|xg|xb)\d+/i.test(mod)) results.ontVol += qty;
+                        if (mod.includes('olt') || mod.includes('service board') || /\bds-p\d+/i.test(mod)) { results.oltVol += qty; breakOltMap[cust] = (breakOltMap[cust] || 0) + qty; }
+                        if (mod.includes('tapo')) breakTapoMap[cust] = (breakTapoMap[cust] || 0) + qty;
+                        if (mod.includes('vigi')) breakVigiMap[cust] = (breakVigiMap[cust] || 0) + qty;
+                        if (mod.includes('tauc')) results.tauc += qty;
+                        const key = `${rY}-${getVal(row, ['month', 'mês']) || 'X'}`;
+                        if (!monthlyProviders[key]) monthlyProviders[key] = new Set();
+                        monthlyProviders[key].add(cust);
+                    } 
                 });
-                results.top20 = currTotal - prevTotal;
-            }
 
-            const mbContainer = document.getElementById('monthlyBreakdownContainer');
-            if (mbContainer) {
-                mbContainer.innerHTML = '';
-                Object.keys(monthlyProviders).sort((a,b) => {
-                    const [y1, m1] = a.split('-'); const [y2, m2] = b.split('-');
-                    return y1 === y2 ? parseInt(m1) - parseInt(m2) : parseInt(y1) - parseInt(y2);
-                }).forEach(k => {
-                    const c = monthlyProviders[k].size; results.capillarity += c;
-                    mbContainer.innerHTML += `<div class="bg-white border rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-colors">
-                        <div class="text-[10px] font-black text-blue-400 uppercase mb-1">${k.replace('-',' / ')}</div>
-                        <div class="text-xl font-black text-slate-800">${formatNum(c)}</div>
-                        <div class="text-[8px] text-slate-400 uppercase font-bold mt-1">Únicos</div>
-                    </div>`;
-                });
+                const tS = document.getElementById('target_stockQ3');
+                if (qs.includes('Q4')) { results.stockQ3 = vS4; if (tS && !baselineTargets['stockQ3']) { tS.value = Math.round(((vS1+vS2+vS3)/3)*1.1); baselineTargets['stockQ3'] = Math.round(((vS1+vS2+vS3)/3)*1.1); } }
+                else if (qs.includes('Q3')) { results.stockQ3 = vS3; if (tS && !baselineTargets['stockQ3']) { tS.value = Math.round(((vS1+vS2)/2)*1.1); baselineTargets['stockQ3'] = Math.round(((vS1+vS2)/2)*1.1); } }
+                
+                results.oltBreak = Object.values(breakOltMap).filter(v => v >= 10).length;
+                results.tapoBreak = Object.values(breakTapoMap).filter(v => v >= 500).length;
+                results.vigiBreak = Object.values(breakVigiMap).filter(v => v >= 500).length;
+
+                const mC = document.getElementById('monthlyBreakdownContainer');
+                if (mC) {
+                    mC.innerHTML = '';
+                    Object.keys(monthlyProviders).sort().forEach(k => {
+                        const sz = monthlyProviders[k].size; results.capillarity += sz;
+                        mC.innerHTML += `<div class="bg-blue-50 p-3 rounded-xl text-center shadow-sm"><div class="text-[8px] font-black text-blue-400 uppercase">${k}</div><div class="text-base font-black">${sz}</div></div>`;
+                    });
+                }
+                
+                currentResults = results; // Guarda em cache
+                renderTable(currentResults);
+            } catch (err) {
+                showModal("Erro de Cálculo", "Ocorreu um erro ao processar os dados. Verifique o formato dos CSVs.");
+            } finally {
+                if (loader) loader.classList.add('hidden');
+                document.getElementById('processBtn').disabled = false;
             }
-            renderTable(results);
         }
 
-        function renderTable(results = {}) {
-            const tbody = document.getElementById('resultsTableBody');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-            let totalScore = 0;
-            const mult = getScale();
-            const selectedQs = getSelectedQuarters();
-            const applyFloor = selectedQs.includes("Q4");
-
-            KPI_CONFIG.forEach(kpi => {
-                let baseTarget = parseFloat(document.getElementById(`target${kpi.id.charAt(0).toUpperCase() + kpi.id.slice(1)}`)?.value) || 0;
-                let appliedTarget = kpi.isFixedScale ? 1 : (baseTarget * mult);
-                if (kpi.isInt) appliedTarget = Math.round(appliedTarget);
-
-                let achieve = kpi.isAutoHit ? appliedTarget : (results[kpi.id] || 0);
-                let percent = appliedTarget > 0 ? achieve / appliedTarget : 0;
-                let floorTriggered = applyFloor && kpi.hasFloor && percent < 0.8;
-                let finalKpiScore = floorTriggered ? 0 : Math.min(percent, kpi.maxRemark) * kpi.ratio;
-                totalScore += finalKpiScore;
-
-                tbody.innerHTML += `<tr class="hover:bg-slate-50 transition-colors group ${floorTriggered ? 'threshold-alert' : ''}">
-                    <td class="px-4 py-4 border-b">
-                        <div class="flex flex-col">
-                            <span class="font-bold text-slate-700 text-xs">${kpi.name}</span>
-                            ${kpi.hasFloor ? '<span class="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">Regra de Barreira 80%</span>' : ''}
-                        </div>
-                    </td>
-                    <td class="px-4 py-4 border-b text-right font-medium text-slate-500 text-xs">${kpi.isCurrency ? formatBRL(appliedTarget) : formatNum(appliedTarget)}</td>
-                    <td class="px-4 py-4 border-b text-right font-black text-slate-800 text-xs">${kpi.isCurrency ? formatBRL(achieve) : formatNum(achieve)}</td>
-                    <td class="px-4 py-4 border-b text-center">
-                        <span class="px-3 py-1 rounded-full text-[10px] font-black ${floorTriggered ? 'bg-red-600 text-white shadow-sm' : (percent >= 1 ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500')}">
-                            ${formatPct(percent)}
-                        </span>
-                    </td>
-                    <td class="px-4 py-4 border-b text-right font-black text-sm ${floorTriggered ? 'text-red-600' : 'text-slate-900'}">
-                        ${formatPct(finalKpiScore)}
-                    </td>
+        function renderRowsHTML(group, results, mult, applyFloor) {
+            let html = '', score = 0;
+            KPI_DEFS.filter(k => k.group === group).forEach(kpi => {
+                const rVal = parseFloat(document.getElementById(`ratio_${kpi.id}`)?.value) || 0;
+                const metaVal = parseFloat(document.getElementById(`target_${kpi.id}`)?.value) || 0;
+                const enEl = document.getElementById('enable_' + kpi.id);
+                const isEn = kpi.group === 'base' || (enEl && enEl.checked);
+                
+                let t, a, p;
+                if (kpi.isFixedScale) { 
+                    t = 1; a = metaVal; p = a; 
+                } else { 
+                    t = kpi.id === 'stockQ3' ? metaVal : metaVal * mult; 
+                    if (kpi.isInt) t = Math.round(t);
+                    a = results[kpi.id] || 0; 
+                    if (kpi.isAutoHit && a === 0) a = t; 
+                    p = t > 0 ? a / t : (a > 0 ? 1.2 : 0); 
+                }
+                
+                p = Math.max(0, p);
+                const floor = applyFloor && kpi.hasFloor && p < 0.8;
+                const fS = (!isEn || floor) ? 0 : Math.min(p, 1.2) * (rVal / 100);
+                score += fS;
+                
+                const sC = !isEn ? 'text-slate-300' : (floor ? 'text-red-600' : (group === 'positive' ? 'text-green-600' : (group === 'negative' ? 'text-red-600' : 'text-slate-800')));
+                
+                html += `<tr class="border-b border-slate-100 ${floor ? 'bg-red-50' : ''} ${!isEn ? 'row-disabled' : ''}">
+                    <td class="px-4 py-3 font-bold text-[11px]">${kpi.name}</td>
+                    <td class="px-4 py-3 text-right text-slate-400 font-bold">${rVal.toFixed(1)}%</td>
+                    <td class="px-4 py-3 text-right text-slate-500 font-medium">${kpi.isFixedScale?'Manual':(kpi.isCurrency?formatBRL(t):formatNum(t))}</td>
+                    <td class="px-4 py-3 text-right font-black text-slate-800">${kpi.isFixedScale?formatNum(a):(kpi.isCurrency?formatBRL(a):formatNum(a))}</td>
+                    <td class="px-4 py-3 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-black ${!isEn?'bg-slate-50 text-slate-300':(floor?'bg-red-500 text-white shadow-lg':(p>=1?'bg-green-100 text-green-700':'bg-slate-100'))}">${isEn?formatPct(p):'-'}</span></td>
+                    <td class="px-4 py-3 text-right font-black ${sC}">${formatPct(fS)}</td>
                 </tr>`;
             });
-
-            document.getElementById('totalScoreCell').innerText = formatPct(totalScore);
-            document.getElementById('finalScoreDisplay').innerText = formatPct(totalScore);
-
-            const pot = parseFloat(bonusPotentialInput.value) || 0;
-            const paid = parseFloat(bonusAlreadyPaidInput.value) || 0;
-            const ytdEarned = pot * (selectedQs.length / 4.0) * totalScore;
-            const net = ytdEarned - paid;
-
-            document.getElementById('ytdTotalValue').innerText = formatBRL(ytdEarned);
-            document.getElementById('netToPayValue').innerText = formatBRL(net);
-            document.getElementById('netPaymentDisplay').innerText = formatBRL(net);
-            document.getElementById('netToPayValue').className = net < 0 ? "text-sm font-black text-red-600" : "font-black text-green-600";
+            return { html, score };
         }
 
-        function showModal(m) { document.getElementById('modalMessage').innerText = m; document.getElementById('messageModal').classList.remove('hidden'); }
+        function renderTable(res = {}) {
+            const tbody = document.getElementById('resultsTableBody');
+            if (!tbody) return;
+            const targetBase = parseInt(document.getElementById('targetBasePeriod')?.value) || 2;
+            const mult = (Array.from(document.querySelectorAll('.quarter-checkbox')).filter(cb => cb.checked).length) / targetBase;
+            const applyFloor = Array.from(document.querySelectorAll('.quarter-checkbox')).filter(cb => cb.checked).map(cb => cb.value).includes("Q4");
+            
+            const b = renderRowsHTML('base', res, mult, applyFloor);
+            const p = renderRowsHTML('positive', res, mult, applyFloor);
+            const n = renderRowsHTML('negative', res, mult, applyFloor);
+
+            let finalHTML = `<tr class="bg-slate-100"><td colspan="6" class="px-4 py-2 font-black text-[10px] uppercase">KPIs Base</td></tr>` + b.html + 
+                            `<tr class="bg-slate-200 font-bold"><td colspan="5" class="px-4 py-2 text-right uppercase text-[10px]">Subtotal Base:</td><td class="px-4 py-2 text-right">${formatPct(b.score)}</td></tr>`;
+            
+            finalHTML += `<tr class="bg-green-50"><td colspan="6" class="px-4 py-2 font-black text-[10px] uppercase">Itens Auxiliares (Bônus)</td></tr>` + (p.html || '<tr><td colspan="6" class="px-4 py-2 text-[10px] italic text-slate-400">Nenhum item ativo</td></tr>') + 
+                         `<tr class="bg-green-100 font-bold"><td colspan="5" class="px-4 py-2 text-right uppercase text-[10px] text-green-800">Subtotal Bônus:</td><td class="px-4 py-2 text-right text-green-800">${formatPct(p.score)}</td></tr>`;
+            
+            finalHTML += `<tr class="bg-red-50"><td colspan="6" class="px-4 py-2 font-black text-[10px] uppercase">Itens de Penalização (Deduções)</td></tr>` + (n.html || '<tr><td colspan="6" class="px-4 py-2 text-[10px] italic text-slate-400">Nenhum item ativo</td></tr>') + 
+                         `<tr class="bg-red-100 font-bold"><td colspan="5" class="px-4 py-2 text-right uppercase text-[10px] text-red-800">Subtotal Penalizações:</td><td class="px-4 py-2 text-right text-red-800">${formatPct(n.score)}</td></tr>`;
+            
+            tbody.innerHTML = finalHTML;
+            const ts = b.score + p.score + n.score;
+            document.getElementById('totalScoreCell').innerText = formatPct(ts);
+            document.getElementById('finalScoreDisplay').innerText = formatPct(ts);
+            
+            const pot = parseFloat(document.getElementById('bonusPotential')?.value) || 0;
+            const paid = parseFloat(document.getElementById('bonusAlreadyPaid')?.value) || 0;
+            const qCount = Array.from(document.querySelectorAll('.quarter-checkbox')).filter(cb => cb.checked).length;
+            const earn = (pot * (qCount / 4.0) * ts) - paid;
+            
+            const netLabel = document.getElementById('netPaymentDisplay');
+            if (netLabel) { netLabel.innerText = formatBRL(earn); netLabel.className = earn < 0 ? "text-2xl font-bold text-red-600" : "text-2xl font-bold text-green-800"; }
+        }
+
+        function showModal(t, m) { 
+            document.getElementById('modalTitle').innerText = t; 
+            document.getElementById('modalMessage').innerText = m; 
+            document.getElementById('messageModal')?.classList.remove('hidden'); 
+        }
         function closeModal() { document.getElementById('messageModal').classList.add('hidden'); }
-        window.onload = () => triggerRecalculation();
+
+        function exportToPDF() {
+            const element = document.getElementById('mainDashboard');
+            const uploadArea = document.getElementById('uploadArea');
+            const processBtn = document.getElementById('processBtn');
+            const btnPdf = event.currentTarget;
+            
+            const originalBtnHtml = btnPdf.innerHTML;
+            btnPdf.innerHTML = '<div class="loader !w-4 !h-4 !border-white !border-t-red-700"></div> <span class="hidden md:inline">A Gerar...</span>';
+            btnPdf.disabled = true;
+
+            if (uploadArea) uploadArea.classList.add('pdf-hide');
+            if (processBtn) processBtn.classList.add('pdf-hide');
+
+            const opt = {
+                margin:       0.2,
+                filename:     'Simulacao_Score_SellOut.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, windowWidth: 1400 },
+                jsPDF:        { unit: 'in', format: 'a3', orientation: 'landscape' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                if (uploadArea) uploadArea.classList.remove('pdf-hide');
+                if (processBtn) processBtn.classList.remove('pdf-hide');
+                btnPdf.innerHTML = originalBtnHtml;
+                btnPdf.disabled = false;
+            }).catch(err => {
+                showModal("Erro", "Ocorreu um erro ao gerar o PDF.");
+                if (uploadArea) uploadArea.classList.remove('pdf-hide');
+                if (processBtn) processBtn.classList.remove('pdf-hide');
+                btnPdf.innerHTML = originalBtnHtml;
+                btnPdf.disabled = false;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initTargetsUI();
+            const btn = document.getElementById('processBtn'), drop = document.getElementById('uploadArea'), fileInput = document.getElementById('csvFileInput');
+            if (drop && fileInput) {
+                drop.addEventListener('click', (e) => { if (e.target !== btn && !btn.contains(e.target)) fileInput.click(); });
+                drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
+                drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+                drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+                fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+            }
+            if (btn) {
+                btn.onclick = (e) => {
+                    e.stopPropagation(); btn.disabled = true; document.getElementById('loadingIndicator')?.classList.remove('hidden');
+                    rawData = []; let c = 0;
+                    uploadedCSVFiles.forEach(f => {
+                        Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => {
+                            rawData = rawData.concat(res.data);
+                            if (++c === uploadedCSVFiles.length) calculateKPIs();
+                        }});
+                    });
+                };
+            }
+            
+            // Separação de eventos pesados vs eventos leves:
+            document.querySelectorAll('.quarter-checkbox, #filterYear, #filterWispOnly').forEach(el => { 
+                el.addEventListener('change', triggerRecalculation); 
+            });
+            document.querySelectorAll('#salary1, #salary2, #salary1Months, #salary2Months, #bonusPotential, #bonusAlreadyPaid, #targetBasePeriod').forEach(el => { 
+                el.addEventListener('change', triggerRenderOnly); 
+            });
+            
+            triggerRecalculation();
+        });
     </script>
 </body>
 </html>
