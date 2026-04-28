@@ -51,11 +51,10 @@
         <div class="glass-panel p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 border border-slate-200">
             <div>
                 <h1 class="text-2xl font-bold text-slate-800"><i class="fa-solid fa-shield-halved text-blue-500 mr-2"></i> Simulador de Bônus</h1>
-                <p class="text-sm text-slate-500 mt-1">Gestão de Score Sell Out | Planeamento de Metas 2026</p>
+                <p class="text-sm text-slate-500 mt-1">Gestão de Score Sell Out | Planeamento de Metas</p>
             </div>
             
             <div class="flex gap-4 items-center">
-                <!-- Botões (Não saem na exportação PDF graças ao atributo data-html2canvas-ignore) -->
                 <div class="flex gap-2" data-html2canvas-ignore="true">
                     <button onclick="openManual()" class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center gap-2 text-xs uppercase" title="Manual de Utilizador">
                         <i class="fa-solid fa-book text-lg"></i> <span class="hidden md:inline">Manual</span>
@@ -309,7 +308,7 @@
         let rawData = [];
         let excelMetaLoaded = false;
         let baselineTargets = {}; 
-        let currentResults = {}; // Memória Cache para performance
+        let currentResults = {}; 
         
         const KPI_DEFS = [
             { id: 'capillarity', keys: ['provider capillarity'], name: 'Provider Capillarity', ratio: 0.30, isInt: true, hasFloor: true, group: 'base' },
@@ -396,7 +395,7 @@
                     applyIndividualProj(kpi.id, true);
                 }
             });
-            triggerRenderOnly(); // Atualiza apenas a tabela uma vez no final!
+            triggerRenderOnly(); 
         }
 
         function resetTargets() {
@@ -456,10 +455,8 @@
                 const workbook = XLSX.read(data);
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 
-                // Primeiro lê como array para identificar o tipo de ficheiro
                 const rowsArray = XLSX.utils.sheet_to_json(sheet, {header: 1}); 
                 
-                // Analisa as primeiras 30 linhas para perceber se é a folha de METAS
                 const isTargets = rowsArray.slice(0, 30).some(row => {
                     const text = row.join(' ').toLowerCase();
                     return text.includes('provider capillarity') || text.includes('director eval');
@@ -478,7 +475,6 @@
                     });
                     excelMetaLoaded = true; 
                 } else {
-                    // Se não é ficheiro de metas, assume que é BASE DE VENDAS e extrai formatado como texto
                     const jsonRows = XLSX.utils.sheet_to_json(sheet, {raw: false, defval: ""});
                     uploadedCSVFiles.push({ name: file.name, isExcelData: true, data: jsonRows });
                 }
@@ -518,20 +514,41 @@
                 rawData.forEach(row => {
                     let rQ = (getVal(row, ['quarter', 'trimestre']) || "").toString().toUpperCase();
                     let rY = (getVal(row, ['year', 'ano']) || "").toString();
-                    if (rQ.includes('1')) rQ = 'Q1'; if (rQ.includes('2')) rQ = 'Q2'; if (rQ.includes('3')) rQ = 'Q3'; if (rQ.includes('4')) rQ = 'Q4';
+                    let monthStr = (getVal(row, ['month', 'mês', 'mes', 'data', 'date']) || "").toString().trim();
+
+                    // Forçar o Quarter baseado estritamente no Mês
+                    if (monthStr) {
+                        if (/jan|fev|mar/i.test(monthStr) || /^(1|01|2|02|3|03)$/.test(monthStr)) rQ = 'Q1';
+                        else if (/apr|abr|may|mai|jun/i.test(monthStr) || /^(4|04|5|05|6|06)$/.test(monthStr)) rQ = 'Q2';
+                        else if (/jul|aug|ago|sep|set/i.test(monthStr) || /^(7|07|8|08|9|09)$/.test(monthStr)) rQ = 'Q3';
+                        else if (/oct|out|nov|dec|dez/i.test(monthStr) || /^(10|11|12)$/.test(monthStr)) rQ = 'Q4';
+                    } else {
+                        if (rQ.includes('1')) rQ = 'Q1'; 
+                        else if (rQ.includes('2')) rQ = 'Q2'; 
+                        else if (rQ.includes('3')) rQ = 'Q3'; 
+                        else if (rQ.includes('4')) rQ = 'Q4';
+                    }
+
+                    if (!rY && monthStr) {
+                        let match = monthStr.match(/\b(202\d)\b/);
+                        if (match) rY = match[1];
+                    }
 
                     let isWisp = !wisp;
                     if (wisp) {
-                        const recat = (getVal(row, ['recategorizacao', 'recat', 'category', 'segmento']) || "").toString().toUpperCase();
-                        const cN = (getVal(row, ['customer', 'cliente']) || "").toString().toUpperCase();
-                        isWisp = recat.includes('WISP') || cN.includes('WISP') || Object.values(row).some(v => (v||"").toString().toUpperCase().includes('WISP'));
+                        const rowStr = Object.values(row).map(v => (v||"").toString().toUpperCase()).join(' ');
+                        isWisp = /WISP[\s-]*PROVIDER/i.test(rowStr) || /WISP[\s-]*MANAGED/i.test(rowStr) || /WISP[\s-]*SUBDISTY/i.test(rowStr);
                     }
                     if (!isWisp) return;
 
                     const amt = parseBRNum(getVal(row, ['amount', 'valor', 'total', 'faturamento']));
                     const qty = parseBRNum(getVal(row, ['qty', 'qtde', 'quantidade', 'volume']));
                     const mod = [getVal(row, ['category','categoria']), getVal(row, ['standard','modelo']), getVal(row, ['item','descrição'])].join(' ').toLowerCase();
-                    const cust = (getVal(row, ['cnpj', 'customer', 'cliente']) || "X").toString().trim();
+                    
+                    // Prioriza a busca pela coluna CNPJ explicitamente
+                    let custCnpj = getVal(row, ['cnpj']);
+                    let custName = getVal(row, ['customer', 'cliente']);
+                    const cust = (custCnpj || custName || "X").toString().trim();
 
                     if (rY === year && (mod.includes('ex511') || mod.includes('ex220') || mod.includes('ec225'))) {
                         if (rQ === 'Q1') vS1 += qty; else if (rQ === 'Q2') vS2 += qty; else if (rQ === 'Q3') vS3 += qty; else if (rQ === 'Q4') vS4 += qty;
@@ -543,13 +560,19 @@
                         if (bu.includes('ENTERPRISE') || bu.includes('ENBU') || mod.includes('omada') || mod.includes('pharos')) results.enbuRev += amt;
                         if (/\b(ex|eb)\d+/i.test(mod)) results.routerVol += qty;
                         if (/\b(xx|xg|xb)\d+/i.test(mod)) results.ontVol += qty;
-                        if (mod.includes('olt') || mod.includes('service board') || /\bds-p\d+/i.test(mod)) { results.oltVol += qty; breakOltMap[cust] = (breakOltMap[cust] || 0) + qty; }
+                        
+                        const isOLT = mod.includes('olt') || mod.includes('service board') || /\bds-p\d+/i.test(mod);
+                        if (isOLT) { results.oltVol += qty; breakOltMap[cust] = (breakOltMap[cust] || 0) + qty; }
                         if (mod.includes('tapo')) breakTapoMap[cust] = (breakTapoMap[cust] || 0) + qty;
                         if (mod.includes('vigi')) breakVigiMap[cust] = (breakVigiMap[cust] || 0) + qty;
                         if (mod.includes('tauc')) results.tauc += qty;
-                        const key = `${rY}-${getVal(row, ['month', 'mês']) || 'X'}`;
+                        
+                        const m = (getVal(row, ['month', 'mês', 'mes']) || 'X').toString();
+                        const key = `${rY}-${m}`;
                         if (!monthlyProviders[key]) monthlyProviders[key] = new Set();
-                        monthlyProviders[key].add(cust);
+                        if (cust !== 'X' && cust !== 'Desconhecido' && cust !== '') {
+                            monthlyProviders[key].add(cust);
+                        }
                     } 
                 });
 
@@ -560,17 +583,21 @@
                 results.oltBreak = Object.values(breakOltMap).filter(v => v >= 10).length;
                 results.tapoBreak = Object.values(breakTapoMap).filter(v => v >= 500).length;
                 results.vigiBreak = Object.values(breakVigiMap).filter(v => v >= 500).length;
+                
+                results.capillarity = 0; 
 
                 const mC = document.getElementById('monthlyBreakdownContainer');
-                if (mC) {
-                    mC.innerHTML = '';
-                    Object.keys(monthlyProviders).sort().forEach(k => {
-                        const sz = monthlyProviders[k].size; results.capillarity += sz;
-                        mC.innerHTML += `<div class="bg-blue-50 p-3 rounded-xl text-center shadow-sm"><div class="text-[8px] font-black text-blue-400 uppercase">${k}</div><div class="text-base font-black">${sz}</div></div>`;
-                    });
-                }
+                if (mC) mC.innerHTML = '';
                 
-                currentResults = results; // Guarda em cache
+                Object.keys(monthlyProviders).sort().forEach(k => {
+                    const sz = monthlyProviders[k].size;
+                    results.capillarity += sz; 
+                    if (mC) {
+                        mC.innerHTML += `<div class="bg-blue-50 p-3 rounded-xl text-center shadow-sm"><div class="text-[8px] font-black text-blue-400 uppercase">${k}</div><div class="text-base font-black">${sz}</div></div>`;
+                    }
+                });
+                
+                currentResults = results;
                 renderTable(currentResults);
             } catch (err) {
                 showModal("Erro de Cálculo", "Ocorreu um erro ao processar os dados. Verifique o formato dos CSVs.");
@@ -719,11 +746,9 @@
                     
                     uploadedCSVFiles.forEach(f => {
                         if (f.isExcelData) {
-                            // Se for ficheiro Excel processado nativamente
                             rawData = rawData.concat(f.data);
                             if (++c === uploadedCSVFiles.length) calculateKPIs();
                         } else {
-                            // Se for CSV normal processado via PapaParse
                             Papa.parse(f, { header: true, skipEmptyLines: true, complete: (res) => {
                                 rawData = rawData.concat(res.data);
                                 if (++c === uploadedCSVFiles.length) calculateKPIs();
@@ -733,7 +758,6 @@
                 };
             }
             
-            // Separação de eventos pesados vs eventos leves:
             document.querySelectorAll('.quarter-checkbox, #filterYear, #filterWispOnly').forEach(el => { 
                 el.addEventListener('change', triggerRecalculation); 
             });
