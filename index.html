@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Comercial</title>
+    <title>Dashboard Comercial ISP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -11,6 +11,8 @@
     <script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Biblioteca para Exportação Nativa de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
@@ -22,6 +24,17 @@
         .modal-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
         .modal-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .modal-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        
+        /* Configuração de Impressão PDF Inteligente via React State */
+        .pdf-mode .no-export { display: none !important; }
+        .pdf-mode .shadow-md, .pdf-mode .shadow-lg, .pdf-mode .shadow-sm, .pdf-mode .shadow-xl, .pdf-mode .shadow-2xl { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+        .pdf-mode .custom-scroll, .pdf-mode .modal-scroll, .pdf-mode .overflow-y-auto { overflow: visible !important; max-height: none !important; height: auto !important; }
+        .pdf-mode .recharts-wrapper { page-break-inside: avoid !important; }
+        .pdf-mode div[class*="bg-white"] { page-break-inside: avoid !important; }
+        .pdf-mode .fixed.inset-0 { position: static !important; background: transparent !important; backdrop-filter: none !important; padding: 0 !important; }
+        .pdf-mode .print-modal-wrapper { max-height: none !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; width: 100% !important; max-width: none !important; }
     </style>
 </head>
 <body>
@@ -31,7 +44,7 @@
         const { useState, useMemo, useEffect, useRef } = React;
         const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Treemap, Legend, ReferenceLine, ScatterChart, Scatter, ZAxis, ComposedChart } = window.Recharts;
 
-        // Configuração de Usuários
+        // --- Configurações de Acesso ---
         const USUARIOS = [
             { nome: "George Silva (Admin)", estados: "ALL", role: "admin", hash: "Z3NpbHZhMDAx" },
             { nome: "Diretoria", estados: "ALL", role: "admin", hash: "YWRtaW4uZGly" },
@@ -46,7 +59,6 @@
             { nome: "Juliana Passo", estados: ["SP"], role: "ev", hash: "anVsaWFuYS5wYXNzbw==" }
         ];
 
-        // Ícones SVG
         const SVG_PATHS = {
             TrendingUp: `<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>`,
             TrendingDown: `<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>`,
@@ -60,17 +72,16 @@
             Package: `<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>`,
             List: `<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>`,
             AlertCircle: `<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>`,
-            UserPlus: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>`,
-            UserMinus: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" y1="11" x2="16" y2="11"/>`,
             Loader2: `<path d="M21 12a9 9 0 1 1-6.219-8.56"/>`,
             Upload: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>`,
             Target: `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>`,
             Download: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`,
             FileSpreadsheet: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h2"></path><path d="M8 17h2"></path><path d="M14 13h2"></path><path d="M14 17h2"></path>`,
             BookOpen: `<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>`,
-            Info: `<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>`,
-            Star: `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
-            Filter: `<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>`
+            UserPlus: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>`,
+            UserMinus: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" y1="11" x2="16" y2="11"/>`,
+            Bell: `<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>`,
+            Filter: `<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>`
         };
 
         const Icon = ({ name, size = 14, className = "" }) => {
@@ -81,10 +92,11 @@
         const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b', '#14b8a6'];
         const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
+        // --- Funções Auxiliares ---
         const removeAccents = (str) => str ? String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
         const formatCurrency = (val) => { const n = Number(val) || 0; return n >= 1e6 ? `R$ ${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `R$ ${(n/1e3).toFixed(2)}k` : `R$ ${n.toFixed(2)}`; };
         const formatShortNum = (val) => { const n = Number(val) || 0; return n >= 1e6 ? `${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}k` : n.toFixed(1); };
-        const formatCnpj = (cnpj) => { const s = String(cnpj||'').replace(/\D/g, ''); return s.length === 14 ? s.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,"$1.$2.$3/$4-$5") : String(cnpj || ''); };
+        const formatCnpj = (cnpj) => { const s = String(cnpj||'').replace(/\D/g, ''); return s; };
         const formatYAxisTick = (val) => { const s = String(val || ''); return s.length > 13 ? s.substring(0, 13) + '...' : s; };
 
         const getRankBadge = (r) => {
@@ -104,16 +116,17 @@
             const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `${title}.csv`; l.click();
         };
 
+        // --- Componentes UI Reutilizáveis ---
         const DebouncedInput = ({ value, onChange, placeholder, icon }) => {
             const [localVal, setLocalVal] = useState(value || ''); const ref = useRef(onChange);
             useEffect(() => { ref.current = onChange; }, [onChange]);
             useEffect(() => { setLocalVal(value || ''); }, [value]);
             useEffect(() => { const id = setTimeout(() => ref.current(localVal), 300); return () => clearTimeout(id); }, [localVal]);
             return (
-                <div className="relative flex items-center h-[24px]">
-                    <Icon name={icon} className="absolute left-2 text-slate-400 pointer-events-none" size={10} />
-                    <input type="text" placeholder={placeholder} value={localVal} onChange={e => setLocalVal(e.target.value)} className="w-full h-full pl-6 pr-5 bg-white border border-slate-200 rounded text-[9px] font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 shadow-sm" />
-                    {localVal && <button onClick={() => { setLocalVal(''); ref.current(''); }} className="absolute right-0 w-6 h-full flex items-center justify-center text-slate-400 hover:text-rose-500"><Icon name="X" size={8} /></button>}
+                <div className="relative flex items-center h-[28px]">
+                    <Icon name={icon} className="absolute left-2.5 text-slate-400 pointer-events-none" size={12} />
+                    <input type="text" placeholder={placeholder} value={localVal} onChange={e => setLocalVal(e.target.value)} className="w-full h-full pl-7 pr-6 bg-white border border-slate-200 rounded-lg text-[10px] font-semibold focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 shadow-sm transition-shadow" />
+                    {localVal && <button onClick={() => { setLocalVal(''); ref.current(''); }} className="absolute right-0 w-7 h-full flex items-center justify-center text-slate-400 hover:text-rose-500"><Icon name="X" size={10} /></button>}
                 </div>
             );
         };
@@ -127,22 +140,22 @@
             const toggleAll = () => { if (options.length > 0 && options.every(o => selected.includes(o.value))) onChange([]); else onChange(options.map(o => o.value)); };
             const displayLabel = multi ? (selected.length === 0 ? placeholder : selected.length === options.length ? 'Todos' : `${selected.length} selec.`) : (options.find(o => o.value === selected)?.label || placeholder);
             return (
-                <div className="relative flex flex-col gap-[1px] min-w-[90px] flex-1" ref={ref}>
-                    {label && <label className="text-[7px] font-black text-slate-400 uppercase tracking-wider">{label}</label>}
-                    <div className="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[8px] font-bold text-slate-700 cursor-pointer flex justify-between items-center shadow-sm h-[24px] hover:bg-slate-50" onClick={() => setIsOpen(!isOpen)}>
-                        <span className="truncate max-w-[120px]">{displayLabel}</span><Icon name="ChevronDown" size={8} className="text-slate-400 shrink-0 ml-1" />
+                <div className="relative flex flex-col gap-1 min-w-[120px] flex-1" ref={ref}>
+                    {label && <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">{label}</label>}
+                    <div className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-[10px] font-bold text-slate-700 cursor-pointer flex justify-between items-center shadow-sm h-[28px] hover:bg-slate-50 transition-colors" onClick={() => setIsOpen(!isOpen)}>
+                        <span className="truncate max-w-[140px]">{displayLabel}</span><Icon name="ChevronDown" size={10} className="text-slate-400 shrink-0 ml-1" />
                     </div>
                     {isOpen && (
-                        <div className="absolute top-[105%] left-0 w-full min-w-[150px] bg-white border border-slate-200 rounded shadow-xl z-50 max-h-60 flex flex-col overflow-hidden">
+                        <div className="absolute top-[105%] left-0 w-full min-w-[180px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-64 flex flex-col overflow-hidden">
                             {searchable && (
-                                <div className="p-1 border-b border-slate-100 bg-slate-50 flex items-center relative">
-                                    <Icon name="Search" size={8} className="text-slate-400 absolute left-2 pointer-events-none" />
-                                    <input type="text" placeholder="Pesquisar..." className="w-full pl-5 pr-4 py-0.5 text-[8px] font-semibold bg-white border border-slate-200 rounded outline-none" onChange={e => setTerm(e.target.value)} value={term} />
+                                <div className="p-2 border-b border-slate-100 bg-slate-50 flex items-center relative">
+                                    <Icon name="Search" size={10} className="text-slate-400 absolute left-4 pointer-events-none" />
+                                    <input type="text" placeholder="Pesquisar..." className="w-full pl-7 pr-4 py-1 text-[10px] font-semibold bg-white border border-slate-200 rounded-lg outline-none focus:ring-1 focus:ring-blue-500" onChange={e => setTerm(e.target.value)} value={term} />
                                 </div>
                             )}
-                            <div className="overflow-y-auto custom-scroll p-1 flex flex-col gap-0.5" style={{maxHeight: '140px'}}>
-                                {multi && <label className="flex items-center gap-1.5 text-[8px] font-bold cursor-pointer px-1 py-1 hover:bg-slate-100 rounded"><input type="checkbox" checked={options.length > 0 && options.every(o => selected.includes(o.value))} onChange={toggleAll} className="w-2.5 h-2.5 accent-blue-600" /> <span>Selecionar Todos</span></label>}
-                                {filteredOptions.map(o => <label key={String(o.value)} onClick={() => { if (!multi) toggleSingle(o.value); }} className={`flex items-center gap-1.5 text-[8px] font-semibold cursor-pointer px-1 py-1 rounded ${!multi && selected === o.value ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50'}`}>{multi && <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggleMulti(o.value)} className="w-2.5 h-2.5 accent-blue-600" />}<span className="truncate">{String(o.label)}</span></label>)}
+                            <div className="overflow-y-auto custom-scroll p-1.5 flex flex-col gap-0.5" style={{maxHeight: '180px'}}>
+                                {multi && <label className="flex items-center gap-2 text-[10px] font-bold cursor-pointer px-2 py-1.5 hover:bg-slate-100 rounded-lg transition-colors"><input type="checkbox" checked={options.length > 0 && options.every(o => selected.includes(o.value))} onChange={toggleAll} className="w-3 h-3 accent-blue-600 rounded" /> <span className="text-blue-700">Selecionar Todos</span></label>}
+                                {filteredOptions.map(o => <label key={String(o.value)} onClick={() => { if (!multi) toggleSingle(o.value); }} className={`flex items-center gap-2 text-[10px] font-semibold cursor-pointer px-2 py-1.5 rounded-lg transition-colors ${!multi && selected === o.value ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50'}`}>{multi && <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggleMulti(o.value)} className="w-3 h-3 accent-blue-600 rounded" />}<span className="truncate">{String(o.label)}</span></label>)}
                             </div>
                         </div>
                     )}
@@ -153,79 +166,35 @@
         const CustomMultiSelect = ({ label, options, selected = [], onChange, placeholder, searchable }) => <CustomSelect label={label} options={options} selected={selected} onChange={onChange} placeholder={placeholder} searchable={searchable} multi={true} />;
 
         const SortHeader = ({ label, isRight, activeSort, sortDir, onSort }) => (
-            <th className={`px-2 py-1 ${isRight ? 'text-right' : 'text-left'} cursor-pointer hover:bg-slate-100 transition-colors border-b border-slate-100`} onClick={onSort}>
-                <div className={`flex items-center gap-1 ${isRight ? 'justify-end' : ''} ${activeSort ? 'text-blue-600' : ''}`}>{String(label)} {activeSort && <Icon name="ChevronDown" size={8} className={sortDir === 'asc' ? 'rotate-180' : ''} />}</div>
+            <th className={`px-3 py-2 ${isRight ? 'text-right' : 'text-left'} cursor-pointer hover:bg-slate-100 transition-colors border-b border-slate-100`} onClick={onSort}>
+                <div className={`flex items-center gap-1.5 ${isRight ? 'justify-end' : ''} ${activeSort ? 'text-blue-600' : ''}`}>{String(label)} {activeSort && <Icon name="ChevronDown" size={10} className={`transition-transform ${sortDir === 'asc' ? 'rotate-180' : ''}`} />}</div>
             </th>
         );
 
         const DataTable = ({ cols, data, footer, onRowClick, selectedRowValue, rowKey="name" }) => (
-            <div className="bg-white rounded border border-slate-200 overflow-hidden shadow-sm mt-2">
-                <div className="overflow-y-auto custom-scroll" style={{maxHeight: '250px'}}>
-                    <table className="w-full text-left border-collapse min-w-[500px]">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-3">
+                <div className="overflow-y-auto custom-scroll" style={{maxHeight: '300px'}}>
+                    <table className="w-full text-left border-collapse min-w-[600px]">
                         <thead className="bg-slate-50 sticky top-0 shadow-sm z-10">
-                            <tr className="text-[7px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                                {cols.map((c, i) => c.sort ? <SortHeader key={i} label={c.label} isRight={c.align === 'text-right'} activeSort={c.activeSort} sortDir={c.sortDir} onSort={c.sort} /> : <th key={i} className={`px-2 py-1 ${c.align || 'text-left'}`}>{String(c.label)}</th>)}
+                            <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+                                {cols.map((c, i) => c.sort ? <SortHeader key={i} label={c.label} isRight={c.align === 'text-right'} activeSort={c.activeSort} sortDir={c.sortDir} onSort={c.sort} /> : <th key={i} className={`px-3 py-2 ${c.align || 'text-left'}`}>{String(c.label)}</th>)}
                             </tr>
                         </thead>
                         <tbody className="bg-white">
                             {data.map((r, i) => (
-                                <tr key={i} onClick={() => { if (onRowClick) onRowClick(r); }} className={`border-b border-slate-50 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${selectedRowValue && selectedRowValue === r[rowKey] ? 'bg-blue-50 border-l-2 border-blue-500' : 'hover:bg-slate-50 border-l-2 border-transparent'}`}>
-                                    {cols.map((c, j) => <td key={j} className={`px-2 py-1 text-[8px] ${c.align || 'text-left'}`}>{c.val(r, i)}</td>)}
+                                <tr key={i} onClick={() => { if (onRowClick) onRowClick(r); }} className={`border-b border-slate-50 transition-colors ${onRowClick ? 'cursor-pointer hover:bg-slate-50' : 'hover:bg-slate-50'} ${selectedRowValue && selectedRowValue === r[rowKey] ? 'bg-blue-50 border-l-4 border-blue-500' : 'border-l-4 border-transparent'}`}>
+                                    {cols.map((c, j) => <td key={j} className={`px-3 py-2 text-[10px] ${c.align || 'text-left'}`}>{c.val(r, i)}</td>)}
                                 </tr>
                             ))}
-                            {data.length === 0 && <tr><td colSpan={cols.length} className="py-4 text-center text-[8px] text-slate-400 font-bold">Sem dados para exibir.</td></tr>}
+                            {data.length === 0 && <tr><td colSpan={cols.length} className="py-8 text-center text-[10px] text-slate-400 font-bold bg-slate-50/50">Sem dados correspondentes para exibir.</td></tr>}
                         </tbody>
-                        {footer && <tfoot className="bg-slate-50 sticky bottom-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">{footer}</tfoot>}
+                        {footer && <tfoot className="bg-slate-50 sticky bottom-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] border-t border-slate-200">{footer}</tfoot>}
                     </table>
                 </div>
             </div>
         );
 
-        const renderBarLabel = (isFat, color) => (props) => {
-            const { x, y, width, height, value } = props; if (!value) return null;
-            return <text x={(x||0) + (width||0) + 4} y={(y||0) + (height||0)/2 + 1} fill={color} textAnchor="start" dominantBaseline="central" fontSize="7" fontWeight="bold">{isFat ? formatCurrency(value) : (Number(value) || 0).toLocaleString('pt-BR') + " un"}</text>;
-        };
-
-        const MiniBarChart = ({ data, color, isFat, title }) => (
-            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-1.5"><h4 className="text-[8px] font-black text-slate-500 uppercase tracking-wider">{String(title)}</h4></div>
-                <div className="h-28 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data} layout="vertical" margin={{left: -15, right: 35}}>
-                            <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize:7,fontWeight:600,fill:'#64748b'}} interval={0} />
-                            <Tooltip formatter={(v) => [isFat ? formatCurrency(v) : (Number(v).toLocaleString('pt-BR') + " un"), isFat ? 'Faturamento' : 'Quantidade']} cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '4px', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '8px', fontWeight: 'bold', padding: '4px'}} />
-                            <Bar dataKey={isFat ? 'valor' : 'qty'} fill={color} radius={[0, 2, 2, 0]} barSize={6} label={renderBarLabel(isFat, color)} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        );
-
-        const MiniLineChart = ({ data, isFat, setMode }) => (
-            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-1.5">
-                    <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Evolução Mensal</h4>
-                    <div className="flex bg-slate-100 p-0.5 rounded">
-                        <button onClick={() => setMode('faturamento')} className={`px-1.5 py-0.5 text-[7px] font-bold rounded transition-colors ${isFat ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>R$ Fat.</button>
-                        <button onClick={() => setMode('quantidade')} className={`px-1.5 py-0.5 text-[7px] font-bold rounded transition-colors ${!isFat ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Unid.</button>
-                    </div>
-                </div>
-                <div className="h-28 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 7, fontWeight: 600, fill: '#94a3b8'}} />
-                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 7, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => isFat ? formatShortNum(v) : (v>=1000 ? (Number(v)/1000).toFixed(1)+'k' : v)} width={30} />
-                            <Tooltip formatter={(v, name) => [isFat ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), "Ano " + String(name)]} contentStyle={{borderRadius: '4px', border: 'none', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', fontSize: '8px', fontWeight: 'bold', padding: '4px'}} />
-                            <Line type="monotone" dataKey={isFat ? 'valor' : 'qty'} stroke="#3b82f6" strokeWidth={1.5} dot={{r: 1.5, fill: "#3b82f6", strokeWidth: 1, stroke: '#fff'}} />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        );
-
-        // Treemap original como pedido
+        // --- Gráficos e Tooltips ---
         const CustomTreemapContentRecharts = (props) => {
             const { x, y, width, height, index, name, value, root } = props;
             if (width < 25 || height < 25) return null; 
@@ -234,54 +203,33 @@
             return (
                 <g>
                     <rect x={x} y={y} width={width} height={height} fill={CHART_COLORS[(index||0)%CHART_COLORS.length]} stroke="#fff" strokeWidth={1} rx={3} ry={3} />
-                    {width > 45 && height > 35 && sName && <text x={x+width/2} y={y+height/2-6} textAnchor="middle" fill="#ffffff" fontSize={11} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">{sName.length > 14 ? sName.substring(0, 14)+'...' : sName}</text>}
-                    {width > 45 && height > 35 && <text x={x+width/2} y={y+height/2+8} textAnchor="middle" fill="#ffffff" fontSize={10} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">{formatShortNum(value)} ({pct}%)</text>}
+                    {width > 45 && height > 35 && sName && (
+                        <text x={x+width/2} y={y+height/2-6} textAnchor="middle" fill="#ffffff" fontSize={11} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">
+                            {sName.length > 14 ? sName.substring(0, 14)+'...' : sName}
+                        </text>
+                    )}
+                    {width > 45 && height > 35 && (
+                        <text x={x+width/2} y={y+height/2+8} textAnchor="middle" fill="#ffffff" fontSize={10} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">
+                            {formatShortNum(value)} ({pct}%)
+                        </text>
+                    )}
                 </g>
             );
         };
 
         const TooltipBox = ({ title, children }) => (
-            <div className="bg-slate-900 p-1.5 rounded shadow-xl border border-slate-700 text-[8px] z-50 text-white min-w-[130px]">
-                {title && <p className="font-black text-blue-300 mb-1 border-b border-slate-700 pb-1 truncate">{title}</p>}
-                <div className="flex flex-col gap-0.5">{children}</div>
+            <div className="bg-slate-900 p-2.5 rounded-xl shadow-2xl border border-slate-700 text-[10px] z-50 text-white min-w-[160px]">
+                {title && <p className="font-black text-blue-300 mb-1.5 border-b border-slate-700 pb-1.5 truncate">{title}</p>}
+                <div className="flex flex-col gap-1">{children}</div>
             </div>
         );
-
-        const CustomYoyTooltip = ({ active, payload, label, yearComparison, isProduct }) => {
-            if (!active || !payload?.length || !yearComparison) return null;
-            const d = payload[0].payload || {}; 
-            const cV = d.curVal||0; const pV = d.compVal||0; const cQ = d.qtyCur||0; const pQ = d.qtyComp||0;
-            const mC = isProduct?cQ:cV; const mP = isProduct?pQ:pV; const g = mP>0?((mC-mP)/mP)*100:null;
-            return (
-                <TooltipBox title={label}>
-                    <div className="flex justify-between items-center gap-2"><span className="text-[7px] text-slate-400">{String(yearComparison.curLabel)}</span><strong className="text-[9px]">{isProduct ? (cQ.toLocaleString('pt-BR') + " un") : formatCurrency(cV)}</strong></div>
-                    {payload.length > 1 && <div className="flex justify-between items-center gap-2"><span className="text-[7px] text-slate-500">{String(yearComparison.prevLabel)}</span><strong className="text-[8px] text-slate-300">{isProduct ? (pQ.toLocaleString('pt-BR') + " un") : formatCurrency(pV)}</strong></div>}
-                    {g !== null && <div className={`mt-1 pt-1 border-t border-slate-700 font-black flex items-center gap-1 ${g>=0?'text-emerald-400':'text-rose-400'}`}><Icon name={g>=0?'TrendingUp':'TrendingDown'} size={8}/>{g>=0?'+':''}{g.toFixed(1)}%</div>}
-                </TooltipBox>
-            );
-        };
 
         const CustomUFTooltip = ({ active, payload }) => {
             if (!active || !payload?.length) return null; const d = payload[0].payload || {};
             return (
                 <TooltipBox title={null}>
-                    <div className="flex items-center gap-1 mb-1 border-b border-slate-700 pb-1"><div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: payload[0].fill}}></div><p className="font-black truncate text-white">{String(d.name || '')}</p></div>
-                    <div className="flex justify-between items-center gap-2"><span className="text-[7px] text-slate-400">Atual:</span><strong className="text-[9px] text-emerald-400">{formatCurrency(d.curVal)}</strong></div>
-                    <div className="flex justify-between items-center gap-2"><span className="text-[7px] text-slate-400">Anterior:</span><strong className="text-[8px] text-slate-300">{formatCurrency(d.compVal)}</strong></div>
-                    {d.growth !== null && <div className={`mt-1 pt-1 border-t border-slate-700 text-[8px] font-black flex items-center gap-1 ${d.growth>=0?'text-emerald-400':'text-rose-400'}`}><Icon name={d.growth>=0?'TrendingUp':'TrendingDown'} size={8}/>{d.growth>=0?'+':''}{Number(d.growth).toFixed(1)}%</div>}
-                </TooltipBox>
-            );
-        };
-
-        const CustomAbcTooltip = ({ active, payload }) => {
-            if (!active || !payload?.length) return null; const d = payload[0].payload || {};
-            return (
-                <TooltipBox title={d.name}>
-                    <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[7px] text-slate-400">Rank:</span><span className="text-[9px] font-black text-white">#{String(d.rank)}</span></div>
-                    <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[7px] text-slate-400">Fat:</span><span className="text-[8px] font-bold text-emerald-400">{formatCurrency(d.amount)}</span></div>
-                    <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[7px] text-slate-400">Repres:</span><span className="text-[8px] font-bold text-slate-300">{Number(d.pct || 0).toFixed(2)}%</span></div>
-                    <div className="flex justify-between items-center gap-2 mb-1"><span className="text-[7px] text-slate-400">Acumulado:</span><span className="text-[8px] font-bold text-fuchsia-400">{Number(d.accPct || 0).toFixed(2)}%</span></div>
-                    <div className="pt-1 border-t border-slate-700 flex justify-between items-center"><span className="text-[7px] text-slate-400">Classificação:</span><span className={`px-1 py-0.5 rounded text-[7px] font-black ${d.curve === 'A' ? 'bg-emerald-500/20 text-emerald-400' : (d.curve === 'B' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-500/20 text-slate-300')}`}>CURVA {String(d.curve)}</span></div>
+                    <div className="flex items-center gap-1.5 mb-1.5 border-b border-slate-700 pb-1.5"><div className="w-2 h-2 rounded-full" style={{backgroundColor: payload[0].fill}}></div><p className="font-black truncate text-white">{String(d.name || '')}</p></div>
+                    <div className="flex justify-between items-center gap-3"><span className="text-[9px] text-slate-400">Total:</span><strong className="text-[11px] text-emerald-400">{formatCurrency(d.value)}</strong></div>
                 </TooltipBox>
             );
         };
@@ -290,57 +238,125 @@
             if (!active || !payload?.length) return null; const d = payload[0].payload || {};
             return (
                 <TooltipBox title={d.name}>
-                    <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[7px] text-slate-400">Faturamento:</span><span className="text-[9px] font-black text-emerald-400">{formatCurrency(d.fatCur)}</span></div>
-                    <div className="flex justify-between items-center gap-2"><span className="text-[7px] text-slate-400">Crescimento:</span><span className={`text-[8px] font-black flex items-center gap-1 ${d.growth>=0?'text-emerald-400':'text-rose-400'}`}><Icon name={d.growth>=0?'TrendingUp':'TrendingDown'} size={8}/>{d.growth>0?'+':''}{Number(d.growth || 0).toFixed(1)}%</span></div>
+                    <div className="flex justify-between items-center gap-3 mb-1"><span className="text-[9px] text-slate-400">Faturamento:</span><span className="text-[11px] font-black text-emerald-400">{formatCurrency(d.fatCur)}</span></div>
+                    <div className="flex justify-between items-center gap-3"><span className="text-[9px] text-slate-400">Crescimento:</span><span className={`text-[10px] font-black flex items-center gap-1 ${d.growth>=0?'text-emerald-400':'text-rose-400'}`}><Icon name={d.growth>=0?'TrendingUp':'TrendingDown'} size={10}/>{d.growth>0?'+':''}{Number(d.growth || 0).toFixed(1)}%</span></div>
                 </TooltipBox>
             );
         };
 
-        const GrowthBadge = ({ growth, curLabel, prevLabel, timeMode = 'YTD' }) => {
-            if (growth === null || growth === undefined) return <div className="mt-1 flex items-center gap-1 text-[7px] font-bold text-slate-400 w-fit">Sem histórico</div>;
-            const isPos = growth > 0; const isNeu = growth === 0; let cC = "text-slate-500"; let iN = "TrendingUp";
-            if (isPos) { cC = "text-emerald-600"; iN = "TrendingUp"; } else if (!isNeu) { cC = "text-rose-600"; iN = "TrendingDown"; }
-            return <div className={`mt-1 flex items-center gap-0.5 text-[8px] font-black w-fit cursor-help ${cC}`} title={`${curLabel} vs ${prevLabel}`}><Icon name={iN} size={8} /> {isPos ? '+' : ''}{Number(growth || 0).toFixed(1)}% <span className="font-semibold text-[6px] text-slate-400 ml-0.5">vs Ant.</span></div>;
+        const CustomYoyTooltip = ({ active, payload, label, yearComparison, isProduct }) => {
+            if (!active || !payload?.length || !yearComparison) return null;
+            const d = payload[0].payload || {}; 
+            const cV = d.curVal||0; const pV = d.compVal||0; const cQ = d.qtyCur||0; const pQ = d.qtyComp||0;
+            const mC = isProduct?cQ:cV; const mP = isProduct?pQ:pV; const g = mP>0?((mC-mP)/mP)*100:null;
+            return (
+                <TooltipBox title={label}>
+                    <div className="flex justify-between items-center gap-3"><span className="text-[9px] text-slate-400">{String(yearComparison.curLabel)}</span><strong className="text-[11px]">{isProduct ? (cQ.toLocaleString('pt-BR') + " un") : formatCurrency(cV)}</strong></div>
+                    {payload.length > 1 && <div className="flex justify-between items-center gap-3"><span className="text-[9px] text-slate-500">{String(yearComparison.prevLabel)}</span><strong className="text-[10px] text-slate-300">{isProduct ? (pQ.toLocaleString('pt-BR') + " un") : formatCurrency(pV)}</strong></div>}
+                    {g !== null && <div className={`mt-1.5 pt-1.5 border-t border-slate-700 font-black flex items-center gap-1 ${g>=0?'text-emerald-400':'text-rose-400'}`}><Icon name={g>=0?'TrendingUp':'TrendingDown'} size={10}/>{g>=0?'+':''}{g.toFixed(1)}%</div>}
+                </TooltipBox>
+            );
         };
 
-        const KPICard = ({ title, metricKey, growthKey, icon, color, met, yearComp, timeMode, isCurrency = false, isNumber = false, onClick = null, toggle = null }) => (
-            <div onClick={onClick} className={`bg-${color==='slate'?'white':color+'-50'} hover:bg-${color==='slate'?'slate-50':color+'-100'} p-2 rounded-xl border border-${color==='slate'?'slate-200':color+'-300'} shadow-md flex flex-col justify-between ${onClick?'cursor-pointer group transition-all':''}`}>
-                <div>
-                    <div className="flex justify-between items-start mb-1">
-                        <div className="flex items-center gap-1">
-                            <p className={`text-${color==='slate'?'slate-400':color+'-600/70'} text-[8px] font-black uppercase ${onClick?'cursor-help border-b border-dashed border-'+color+'-400':''} w-fit`}>{String(title)}</p>
-                            {toggle && <button onClick={(e)=>{e.stopPropagation(); toggle();}} className={`text-[6px] font-black uppercase bg-${color}-200/50 text-${color}-700 px-1 py-0.5 rounded hover:bg-${color}-600 hover:text-white transition-colors`}>Alternar</button>}
-                        </div>
-                        <Icon name={icon} size={10} className={`text-${color==='slate'?'slate-300':color+'-400'} ${onClick?'group-hover:text-'+(color==='slate'?'blue':color)+'-600':''}`} />
-                    </div>
-                    <h3 className={`text-sm font-black text-${color==='slate'?'slate-800':color+'-700'}`}>{isCurrency ? formatCurrency(met[metricKey]) : isNumber ? (Number(met[metricKey])||0).toLocaleString('pt-BR') : formatCurrency(met[metricKey]||0)}</h3>
+        const CustomAbcTooltip = ({ active, payload }) => {
+            if (!active || !payload?.length) return null; const d = payload[0].payload || {};
+            return (
+                <TooltipBox title={d.name}>
+                    <div className="flex justify-between items-center gap-3 mb-1"><span className="text-[9px] text-slate-400">Rank:</span><span className="text-[11px] font-black text-white">#{String(d.rank)}</span></div>
+                    <div className="flex justify-between items-center gap-3 mb-1"><span className="text-[9px] text-slate-400">Fat:</span><span className="text-[10px] font-bold text-emerald-400">{formatCurrency(d.amount)}</span></div>
+                    <div className="flex justify-between items-center gap-3 mb-1"><span className="text-[9px] text-slate-400">Repres:</span><span className="text-[10px] font-bold text-slate-300">{Number(d.pct || 0).toFixed(2)}%</span></div>
+                    <div className="flex justify-between items-center gap-3 mb-1.5"><span className="text-[9px] text-slate-400">Acumulado:</span><span className="text-[10px] font-bold text-fuchsia-400">{Number(d.accPct || 0).toFixed(2)}%</span></div>
+                    <div className="pt-1.5 border-t border-slate-700 flex justify-between items-center"><span className="text-[9px] text-slate-400">Classificação:</span><span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${d.curve === 'A' ? 'bg-emerald-500/20 text-emerald-400' : (d.curve === 'B' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-500/20 text-slate-300')}`}>CURVA {String(d.curve)}</span></div>
+                </TooltipBox>
+            );
+        };
+
+        const renderBarLabel = (isFat, color) => (props) => {
+            const { x, y, width, height, value } = props; if (!value) return null;
+            return <text x={(x||0) + (width||0) + 6} y={(y||0) + (height||0)/2 + 1} fill={color} textAnchor="start" dominantBaseline="central" fontSize="9" fontWeight="bold">{isFat ? formatCurrency(value) : (Number(value) || 0).toLocaleString('pt-BR') + " un"}</text>;
+        };
+
+        const MiniBarChart = ({ data, color, isFat, title }) => (
+            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-center mb-2"><h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{String(title)}</h4></div>
+                <div className="h-32 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data} layout="vertical" margin={{left: -20, right: 40}}>
+                            <XAxis type="number" hide />
+                            <YAxis dataKey="name" type="category" width={90} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize:9,fontWeight:700,fill:'#64748b'}} interval={0} />
+                            <Tooltip formatter={(v) => [isFat ? formatCurrency(v) : (Number(v).toLocaleString('pt-BR') + " un"), isFat ? 'Faturamento' : 'Quantidade']} cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '10px', fontWeight: 'bold'}} />
+                            <Bar dataKey={isFat ? 'valor' : 'qty'} fill={color} radius={[0, 4, 4, 0]} barSize={8} label={renderBarLabel(isFat, color)} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
-                {growthKey ? (
-                    <div className="flex flex-col gap-0.5 mt-auto">
-                        {['Clientes Novos', 'Clientes Perdidos'].includes(title) ? (
-                            <div className="mt-1 flex items-center gap-1 text-[8px] font-black text-slate-500 w-fit"><span className={title === 'Clientes Novos' ? 'text-emerald-600' : 'text-rose-600'}>+{formatCurrency(met[growthKey])}</span></div>
-                        ) : <GrowthBadge growth={met[growthKey]} curLabel={yearComp?.curLabel} prevLabel={yearComp?.prevLabel} timeMode={timeMode} />}
-                        {onClick && <div className={`mt-1 flex items-center gap-1 text-[7px] font-bold w-fit px-1.5 py-0.5 rounded bg-${color==='slate'?'slate-50':'white'} text-${color==='slate'?'slate-500':color+'-500'} group-hover:bg-${color==='slate'?'blue-100':color+'-600'} group-hover:text-${color==='slate'?'blue-600':'white'} border border-slate-200 transition-colors shadow-sm`}>{title==='Preço Médio'?'Ver Tabela':'Raio-X'}</div>}
-                    </div>
-                ) : <div className="flex flex-col gap-0.5 mt-auto"><div className={`mt-1 flex items-center gap-1 text-[7px] font-bold w-fit px-1.5 py-0.5 rounded bg-${color}-200/50 text-${color}-700 group-hover:bg-${color}-600 group-hover:text-white transition-colors shadow-sm`}>Detalhes</div></div>}
             </div>
         );
 
-        const RankWidget = ({ title, icon, colorClass, fillHex, data, isFat, onOpenModal, timeMode, yearComparison }) => (
-            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-md flex flex-col group">
+        const MiniLineChart = ({ data, isFat, setMode }) => (
+            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1"><Icon name={icon} size={10} className={colorClass} /> {String(title)}</h3>
-                    <button onClick={onOpenModal} className={`text-[7px] font-bold ${colorClass} bg-slate-50 px-2 py-1 rounded border border-slate-200 flex items-center gap-1 hover:bg-slate-100 transition-colors shadow-sm`}><Icon name="List" size={8} /> Raio-X</button>
+                    <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Evolução Mensal</h4>
+                    <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        <button onClick={() => setMode('faturamento')} className={`px-2 py-1 text-[8px] font-bold rounded-md transition-colors ${isFat ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>R$ Fat.</button>
+                        <button onClick={() => setMode('quantidade')} className={`px-2 py-1 text-[8px] font-bold rounded-md transition-colors ${!isFat ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Unid.</button>
+                    </div>
                 </div>
-                <div className="h-40 w-full">
+                <div className="h-32 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 35, left: 0, bottom: 0 }}>
+                        <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} tickFormatter={v => isFat ? formatShortNum(v) : (v>=1000 ? (Number(v)/1000).toFixed(1)+'k' : v)} width={40} />
+                            <Tooltip formatter={(v, name) => [isFat ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), "Ano " + String(name)]} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '10px', fontWeight: 'bold'}} />
+                            <Line type="monotone" dataKey={isFat ? 'valor' : 'qty'} stroke="#3b82f6" strokeWidth={2} dot={{r: 2, fill: "#3b82f6", strokeWidth: 1.5, stroke: '#fff'}} activeDot={{r: 4}} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        );
+
+        const KPICard = ({ title, metricKey, growthKey, icon, color, met, yearComp, timeMode, isCurrency = false, isNumber = false, onClick = null, toggle = null }) => {
+            const value = met ? met[metricKey] : 0;
+            const growth = growthKey && met ? met[growthKey] : null;
+            return (
+                <div onClick={onClick} className={`bg-white p-4 rounded-2xl border border-slate-200 shadow-md flex flex-col justify-between ${onClick?'cursor-pointer hover:bg-slate-50 transition-all hover:shadow-lg hover:-translate-y-0.5':''}`}>
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-1.5">
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{title}</p>
+                            {toggle && <button onClick={(e)=>{e.stopPropagation(); toggle();}} className={`text-[7px] font-black uppercase bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-600 hover:text-white transition-colors no-export`}>Alternar</button>}
+                        </div>
+                        <div className={`p-1.5 rounded-lg bg-${color}-50 text-${color}-500 border border-${color}-100`}><Icon name={icon} size={14} /></div>
+                    </div>
+                    <h3 className={`text-xl font-black text-slate-800 ${isCurrency && value >= 1e6 ? 'tracking-tighter' : ''}`}>
+                        {isCurrency ? formatCurrency(value) : isNumber ? (Number(value)||0).toLocaleString('pt-BR') : value}
+                    </h3>
+                    <div className="mt-2 h-[18px]">
+                        {growth !== null && growth !== undefined ? (
+                            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black border ${growth >= 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`} title={`${yearComp?.curLabel} vs ${yearComp?.prevLabel}`}>
+                                <Icon name={growth >= 0 ? 'TrendingUp' : 'TrendingDown'} size={10} />
+                                {growth >= 0 ? '+' : ''}{Number(growth).toFixed(1)}% <span className="opacity-70 ml-0.5">vs Ant.</span>
+                            </div>
+                        ) : <div className="text-[9px] text-slate-400 font-bold px-1">Sem histórico</div>}
+                    </div>
+                </div>
+            );
+        };
+
+        const RankWidget = ({ title, icon, colorClass, fillHex, data, isFat, onOpenModal, yearComparison }) => (
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex flex-col group">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Icon name={icon} size={14} className={colorClass} /> {String(title)}</h3>
+                    <button onClick={onOpenModal} className={`text-[9px] font-bold ${colorClass} bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center gap-1.5 hover:bg-slate-100 transition-colors shadow-sm no-export`}><Icon name="List" size={10} /> Raio-X</button>
+                </div>
+                <div className="h-48 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 40, left: -10, bottom: 0 }}>
                             <XAxis type="number" hide={true} />
-                            <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize: 7, fontWeight: 700, fill: '#64748b'}} interval={0} />
+                            <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize: 9, fontWeight: 800, fill: '#64748b'}} interval={0} />
                             <Tooltip content={(props) => <CustomYoyTooltip {...props} yearComparison={yearComparison} isProduct={!isFat} />} cursor={{fill: '#f8fafc'}} />
-                            <Legend verticalAlign="top" height={16} iconType="circle" wrapperStyle={{ fontSize: '7px', fontWeight: 'bold', color: '#64748b' }} />
-                            <Bar dataKey={isFat?'curVal':'qtyCur'} name="Atual" fill={fillHex} radius={[0, 2, 2, 0]} barSize={4} label={renderBarLabel(isFat, fillHex)} />
-                            <Bar dataKey={isFat?'compVal':'qtyComp'} name="Anterior" fill="#cbd5e1" radius={[0, 2, 2, 0]} barSize={4} />
+                            <Legend verticalAlign="top" height={20} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b' }} />
+                            <Bar dataKey={isFat?'curVal':'qtyCur'} name="Atual" fill={fillHex} radius={[0, 4, 4, 0]} barSize={6} label={renderBarLabel(isFat, fillHex)} />
+                            <Bar dataKey={isFat?'compVal':'qtyComp'} name="Anterior" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={6} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -369,9 +385,9 @@
             const [localModalSearch, setLocalModalSearch] = useState('');
             const [modalUfFilter, setModalUfFilter] = useState([]);
             const [modalYearFilter, setModalYearFilter] = useState('Todos');
+            const [modalClientFilter, setModalClientFilter] = useState('TODOS'); 
             const [modalDistributorFilter, setModalDistributorFilter] = useState('TODOS'); 
             const [modalProductFilter, setModalProductFilter] = useState('TODOS'); 
-            const [modalClientFilter, setModalClientFilter] = useState('TODOS'); 
             const [modalAbcFilter, setModalAbcFilter] = useState('TODOS');
             const [modalRepFilter, setModalRepFilter] = useState('TODOS'); 
             const [selectedOpportunity, setSelectedOpportunity] = useState(null);
@@ -383,6 +399,7 @@
             const [activeManualTab, setActiveManualTab] = useState('conceitos'); 
             const [initialFilters, setInitialFilters] = useState(null);
             const [matrixShowInactive, setMatrixShowInactive] = useState(false);
+            const [isPdfMode, setIsPdfMode] = useState(false);
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0]; if (!file) return;
@@ -470,13 +487,10 @@
                                         }
                                         if (resData.length === 0) throw new Error("Base lida, mas sem dados válidos para a sua região."); 
                                         
-                                        // Auto-selecionar WISP
                                         const wispTypes = [...new Set(resData.map(x => x._customerType))].filter(t => String(t).toUpperCase().includes('WISP'));
-
                                         setData(resData); setIsLoaded(true); 
                                         const initialF = { searchCustomer: '', searchProduct: '', years: maxFoundYear > 0 ? [String(maxFoundYear)] : [], months: [], state: [], city: [], distributor: [], customerType: wispTypes, type: [], product: [] };
-                                        setFilters(initialF);
-                                        setInitialFilters(initialF);
+                                        setFilters(initialF); setInitialFilters(initialF);
                                         let warningTxt = missingDateRows > 0 ? ` | Aviso: ${missingDateRows} vendas sem data` : "";
                                         if (maxDateTs > 0) { const d = new Date(maxDateTs); setLastUpdate(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}${warningTxt}`); } 
                                         else { setLastUpdate(`Sincronizado${warningTxt}`); }
@@ -497,7 +511,31 @@
             };
 
             const openModal = (type) => { setModalConfig({ isOpen: true, type }); setLocalModalSearch(''); if (type === 'abc') setModalAbcFilter('TODOS'); if (type === 'representatividade') setModalRepFilter('TODOS'); if (type === 'analitico') setAnaliticoSortConfig({ column: 'data', direction: 'desc' }); if (type === 'matriz') setMatrizSortConfig({ column: 'fatCur', direction: 'desc' }); };
-            const exportToPDF = () => { alert("Por favor, utilize a Exportação para Excel para baixar o relatório completo sem perdas de visualização."); };
+            
+            const exportToPDF = () => {
+                setIsPdfMode(true);
+                setTimeout(() => {
+                    const element = document.getElementById('main-dashboard-export-area');
+                    if (!element) {
+                        setIsPdfMode(false);
+                        return;
+                    }
+                    const opt = {
+                        margin:       5,
+                        filename:     `Dashboard_${modalConfig.type || 'Geral'}.pdf`,
+                        image:        { type: 'jpeg', quality: 0.98 },
+                        html2canvas:  { scale: 2, useCORS: true, logging: false },
+                        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' }
+                    };
+                    
+                    window.html2pdf().set(opt).from(element).save().then(() => {
+                        setIsPdfMode(false);
+                    }).catch((err) => {
+                        console.error("Erro ao gerar PDF:", err);
+                        setIsPdfMode(false);
+                    });
+                }, 500); 
+            };
 
             const availableOptions = useMemo(() => {
                 if (!data.length) return { years: [], months: [], states: [], cities: [], distributors: [], customerTypes: [], types: [], products: [] };
@@ -536,8 +574,8 @@
                     let endMonth = explicitMonths.length > 0 ? explicitMonths[explicitMonths.length - 1] : maxAvailMonth; if (endMonth > maxAvailMonth) endMonth = maxAvailMonth; 
                     curSpan = timeMode === 'U6M' ? 6 : 12; curEndAbs = refYears[0] * 12 + endMonth;
                     const curStartAbs = curEndAbs - (curSpan - 1); const prevEndAbs = curEndAbs - curSpan; const prevStartAbs = prevEndAbs - (curSpan - 1);
-                    curLabel = `${MONTH_NAMES[(curStartAbs-1)%12]}/${Math.floor((curStartAbs-1)/12).toString().slice(-2)} a ${MONTH_NAMES[(curEndAbs-1)%12]}/${Math.floor((curEndAbs-1)/12).toString().slice(-2)}`;
-                    prevLabel = `${MONTH_NAMES[(prevStartAbs-1)%12]}/${Math.floor((prevStartAbs-1)/12).toString().slice(-2)} a ${MONTH_NAMES[(prevEndAbs-1)%12]}/${Math.floor((prevEndAbs-1)/12).toString().slice(-2)}`;
+                    curLabel = `${MONTH_NAMES[Math.max(0, (curStartAbs-1)%12) || 0]}/${Math.floor(Math.max(0, curStartAbs-1)/12).toString().slice(-2)} a ${MONTH_NAMES[Math.max(0, (curEndAbs-1)%12) || 0]}/${Math.floor(Math.max(0, curEndAbs-1)/12).toString().slice(-2)}`;
+                    prevLabel = `${MONTH_NAMES[Math.max(0, (prevStartAbs-1)%12) || 0]}/${Math.floor(Math.max(0, prevStartAbs-1)/12).toString().slice(-2)} a ${MONTH_NAMES[Math.max(0, (prevEndAbs-1)%12) || 0]}/${Math.floor(Math.max(0, prevEndAbs-1)/12).toString().slice(-2)}`;
                     dataCur = data.filter(x => { if (!passesBaseFilter(x)) return false; const a = x._year * 12 + x._month; return a >= curStartAbs && a <= curEndAbs; }); 
                     dataComp = data.filter(x => { if (!passesBaseFilter(x)) return false; const a = x._year * 12 + x._month; return a >= prevStartAbs && a <= prevEndAbs; });
                 } else {
@@ -586,7 +624,7 @@
                 return { data: resultData, lines: linesArray };
             }, [data, filters, evolucaoMode]);
             
-            const evolutionChartMedia = useMemo(() => { const lines = evolutionChartData.lines; if (!lines.length) return null; const vals = evolutionChartData.data.map(d => d[lines[lines.length - 1]]).filter(v => v !== null && v > 0); return vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : null; }, [evolutionChartData]);
+            const evolutionChartMedia = useMemo(() => { const lines = evolutionChartData.lines; if (!lines.length) return null; const vals = evolutionChartData.data.map(d => d[lines[lines.length - 1]]).filter(v => v !== null && v > 0); return vals.length > 0 ? vals.reduce((a,b) => a+b, 0) / vals.length : null; }, [evolutionChartData]);
 
             const activeModalDataList = useMemo(() => {
                 if (modalConfig.type === 'novos') return globalMetrics.novosDetails; if (modalConfig.type === 'perdidos') return globalMetrics.perdidosDetails; if (modalConfig.type === 'alerta') return globalMetrics.alertaDetails; return [];
@@ -614,8 +652,8 @@
 
             const getRankedProp = (prop) => {
                 if (!yearComparisonData?.dataCur) return []; const m = new Map();
-                yearComparisonData.dataCur.forEach(d => { const k = d[prop]; if (!m.has(k)) m.set(k, { curVal: 0, qtyCur: 0, compVal: 0, qtyComp: 0 }); const e = m.get(k); e.curVal += d._amount; e.qtyCur += d._qty; });
-                yearComparisonData.dataComp.forEach(d => { const k = d[prop]; if (!m.has(k)) m.set(k, { curVal: 0, qtyCur: 0, compVal: 0, qtyComp: 0 }); const e = m.get(k); e.compVal += d._amount; e.qtyComp += d._qty; });
+                yearComparisonData.dataCur.forEach(d => { const k = d[prop] || 'N/I'; if (!m.has(k)) m.set(k, { curVal: 0, qtyCur: 0, compVal: 0, qtyComp: 0 }); const e = m.get(k); e.curVal += d._amount; e.qtyCur += d._qty; });
+                yearComparisonData.dataComp.forEach(d => { const k = d[prop] || 'N/I'; if (m.has(k)) { m.get(k).compVal += d._amount; m.get(k).qtyComp += d._qty; } });
                 const result = Array.from(m.entries()).map(([name,v]) => ({name, ...v})).sort((a,b) => prop === '_product' ? b.qtyCur - a.qtyCur : b.curVal - a.curVal); result.forEach((x,i) => x.rank = i + 1); return result;
             };
             
@@ -623,12 +661,7 @@
             const fullRankedDistributors = useMemo(() => getRankedProp('_distributor'), [yearComparisonData]); const topDistribuidoresGlobal = useMemo(() => fullRankedDistributors.slice(0, 10), [fullRankedDistributors]);
             
             const topClientsGlobal = useMemo(() => globalMetrics.allClientsRanked.slice(0, 10).map(c => ({
-                ...c, 
-                name: `${c.name.substring(0, 15)} ${c.cnpj ? `(${formatCnpj(c.cnpj)})` : ''}`,
-                curVal: c.fatCur || 0, 
-                compVal: c.fatComp || 0, 
-                qtyCur: c.qtyCur || 0, 
-                qtyComp: c.qtyComp || 0
+                ...c, name: `${String(c.name || '').substring(0, 15)} ${c.cnpj ? `(${formatCnpj(c.cnpj)})` : ''}`, curVal: c.fatCur || 0, compVal: c.fatComp || 0, qtyCur: c.qtyCur || 0, qtyComp: c.qtyComp || 0
             })), [globalMetrics.allClientsRanked]);
 
             const pieChartDataMain = useMemo(() => {
@@ -675,68 +708,6 @@
                 return { fatCur: segmentFatCur, fatComp: segmentFatComp, capilaridade: clientsSet.size, growth: segmentFatComp > 0 ? ((segmentFatCur - segmentFatComp) / segmentFatComp) * 100 : null, clientList: availableClientList, topProducts: topProdLocal, topClients: topCliLocal, options: dropdownOpts, opportunities: opps, totalGap: totalGapCalc, clientProductMap: clientProdMap, isOverview: false };
             }, [yearComparisonData, modalConfig.type, modalRepFilter, pieChartMetric, modalUfFilter, selectedOpportunity]);
 
-            const scatterPlotData = useMemo(() => {
-                if (!yearComparisonData?.dataCur) return { data: [], filtered: [], avgFat: 0, avgGrowth: 0, thresholdG: 0 }; 
-                const m = new Map(); const isClient = scatterMetric === 'clientes'; const kProp = scatterMetric === 'produtos' ? '_product' : scatterMetric === 'distribuidores' ? '_distributor' : 'cnpj';
-                yearComparisonData.dataCur.forEach(d => { const k = d[kProp] || 'Outros'; if (!m.has(k)) m.set(k, { name: isClient ? (d._customer || 'N/I') : k, fatCur: 0, fatComp: 0 }); m.get(k).fatCur += d._amount; });
-                yearComparisonData.dataComp.forEach(d => { const k = d[kProp] || 'Outros'; if (!m.has(k)) m.set(k, { name: isClient ? (d._customer || 'N/I') : k, fatCur: 0, fatComp: 0 }); m.get(k).fatComp += d._amount; });
-                let allValid = Array.from(m.values()).filter(d => d.fatComp > 0 && (matrixShowInactive ? true : d.fatCur > 0)).map(d => ({ ...d, growth: ((d.fatCur - d.fatComp) / d.fatComp) * 100 })).sort((a,b) => b.fatCur - a.fatCur);
-                
-                const avgF = allValid.length > 0 ? allValid.reduce((a, d) => a + d.fatCur, 0) / allValid.length : 0; 
-                const totalFatCurScatter = allValid.reduce((a, d) => a + d.fatCur, 0);
-                const totalFatCompScatter = allValid.reduce((a, d) => a + d.fatComp, 0);
-                const avgG = totalFatCompScatter > 0 ? ((totalFatCurScatter - totalFatCompScatter) / totalFatCompScatter) * 100 : 0;
-                
-                const thresholdG = Math.max(0, avgG);
-
-                const dataWithQuads = allValid.map((e, i) => { 
-                    let q = ''; let c = ''; let bg = ''; let fh = '#cbd5e1'; 
-                    if (e.fatCur >= avgF && e.growth >= thresholdG) { q = 'Estrela'; c = 'text-emerald-700'; bg = 'bg-emerald-100'; fh = '#10b981'; }
-                    else if (e.fatCur >= avgF && e.growth < thresholdG) { q = 'Vaca Leiteira'; c = 'text-blue-700'; bg = 'bg-blue-100'; fh = '#3b82f6'; }
-                    else if (e.fatCur < avgF && e.growth >= thresholdG) { q = 'Aposta'; c = 'text-amber-700'; bg = 'bg-amber-100'; fh = '#f59e0b'; }
-                    else { q = 'Abacaxi'; c = 'text-rose-700'; bg = 'bg-rose-100'; fh = '#ef4444'; } 
-                    return { ...e, rank: i+1, quadrant: q, color: c, bg: bg, fillHex: fh }; 
-                });
-
-                const filtered = dataWithQuads.filter(d => { if (localModalSearch && !removeAccents(d.name).toLowerCase().includes(removeAccents(localModalSearch).toLowerCase())) return false; return true; }).sort((a,b) => { const col = matrizSortConfig.column; const dir = matrizSortConfig.direction === 'desc' ? -1 : 1; if (col === 'quadrant' || col === 'name') return String(a[col] || '').localeCompare(String(b[col] || '')) * dir; return ((a[col] || 0) - (b[col] || 0)) * dir; });
-                return { data: dataWithQuads.slice(0, 50), filtered: filtered, avgFat: avgF, avgGrowth: avgG, thresholdG: thresholdG };
-            }, [yearComparisonData, scatterMetric, localModalSearch, matrizSortConfig, matrixShowInactive]);
-
-            const availableModalUfs = useMemo(() => {
-                const base = ['capilaridade','distribuidores','produtos','top','preco','analitico','abc','matriz','representatividade'].includes(modalConfig.type) ? (yearComparisonData?.dataCur || []) : activeModalDataList;
-                return [...new Set(base.map(d => d._state || d.state))].filter(Boolean).sort();
-            }, [yearComparisonData, activeModalDataList, modalConfig.type]);
-            
-            const modalUfOptionsFormatted = useMemo(() => availableModalUfs.map(u => ({label: String(u), value: String(u)})), [availableModalUfs]);
-            
-            const ufsToPlotCapilaridade = useMemo(() => {
-                const dynamicUfs = [...new Set((yearComparisonData?.dataCur || []).map(d => d._state))].filter(Boolean).sort();
-                if (!modalUfFilter.length || modalUfFilter.includes('Todos')) return dynamicUfs;
-                return Array.isArray(modalUfFilter) ? modalUfFilter : [modalUfFilter];
-            }, [yearComparisonData, modalUfFilter]);
-            
-            const isCompareUFModal = modalConfig.type === 'capilaridade' && modalUfFilter.length > 0 && modalUfFilter.length !== availableModalUfs.length;
-
-            const chartDataCapilaridade = useMemo(() => {
-                if (!data.length || modalConfig.type !== 'capilaridade') return []; 
-                const m = new Map();
-                modalDataFiltered.forEach(d => {
-                    if (!d._year || !d._month || !d.cnpj) return;
-                    const k = `${d._year}-${d._month}`;
-                    if (!m.has(k)) m.set(k, { totalSet: new Set(), ufSets: new Map(), year: d._year, month: d._month });
-                    const e = m.get(k); e.totalSet.add(d.cnpj);
-                    if (ufsToPlotCapilaridade.includes(d._state)) { if (!e.ufSets.has(d._state)) e.ufSets.set(d._state, new Set()); e.ufSets.get(d._state).add(d.cnpj); }
-                });
-                return Array.from(m.values()).filter(x => modalYearFilter === 'Todos' || x.year === Number(modalYearFilter)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.month - b.month).map(x => {
-                    const o = { name: modalYearFilter === 'Todos' ? `${MONTH_NAMES[x.month-1]}/${String(x.year).slice(2)}` : MONTH_NAMES[x.month-1], Total: x.totalSet.size };
-                    ufsToPlotCapilaridade.forEach(u => o[u] = x.ufSets.has(u) ? x.ufSets.get(u).size : 0); return o;
-                });
-            }, [modalDataFiltered, data.length, modalConfig.type, modalYearFilter, ufsToPlotCapilaridade]);
-
-            const totalAnaliticoQtd = useMemo(() => modalDataFiltered.reduce((a,d) => a + (Number(d._qty) || 0), 0), [modalDataFiltered]); 
-            const totalAnaliticoFat = useMemo(() => modalDataFiltered.reduce((a,d) => a + (Number(d._amount) || 0), 0), [modalDataFiltered]); 
-            const precoMedioAnalitico = totalAnaliticoQtd > 0 ? totalAnaliticoFat / totalAnaliticoQtd : 0;
-            
             const abcDataRaw = useMemo(() => {
                 if (modalConfig.type !== 'abc' || !yearComparisonData?.dataCur) return null; 
                 const m = new Map(); let tF = 0; const isClient = abcDimension === 'clientes';
@@ -772,46 +743,6 @@
             const filteredAbcList = useMemo(() => {
                 if (!abcDataRaw) return []; return modalAbcFilter !== 'TODOS' ? abcDataRaw.list.filter(x => x.name === modalAbcFilter) : abcDataRaw.list;
             }, [abcDataRaw, modalAbcFilter]);
-
-            const sortedClientsList = useMemo(() => {
-                if (modalConfig.type !== 'top' || modalClientFilter !== 'TODOS') return []; 
-                let s = [...(globalMetrics.allClientsRanked || [])];
-                if (localModalSearch) {
-                    const t = removeAccents(localModalSearch).toLowerCase().trim(); const tD = t.replace(/\D/g, '');
-                    s = s.filter(d => removeAccents(String(d.name || '').toLowerCase()).includes(t) || (tD && String(d.cnpj || '').includes(tD)) || removeAccents(String(d.city || '').toLowerCase()).includes(t));
-                }
-                if (modalUfFilter.length > 0) s = s.filter(d => modalUfFilter.includes(d.state));
-                return s.sort((a,b) => {
-                    let aV = a[clientSortConfig.column]; let bV = b[clientSortConfig.column];
-                    if (aV === null || aV === undefined) aV = -Infinity; if (bV === null || bV === undefined) bV = -Infinity;
-                    if (aV < bV) return clientSortConfig.direction === 'asc' ? -1 : 1; if (aV > bV) return clientSortConfig.direction === 'asc' ? 1 : -1; return 0;
-                });
-            }, [globalMetrics.allClientsRanked, clientSortConfig, modalConfig.type, modalClientFilter, localModalSearch, modalUfFilter]);
-
-            const availableModalDistribuidores = useMemo(() => {
-                const s = new Set(); (yearComparisonData?.dataCur || []).forEach(d => { if (modalUfFilter.length > 0 && !modalUfFilter.includes(d._state)) return; if (d._distributor && d._distributor !== 'N/I') s.add(d._distributor); });
-                const rM = new Map(); (fullRankedDistributors || []).forEach(d => rM.set(d.name, d)); const o = [];
-                s.forEach(n => { const rI = rM.get(n); if (rI && rI.curVal > 0) o.push({ value: String(n), label: `#${rI.rank} - ${n} (${formatCurrency(rI.curVal)})`, sortVal: rI.curVal }); else o.push({ value: String(n), label: `${n} (Sem vendas)`, sortVal: -1 }); });
-                o.sort((a, b) => { if (a.sortVal > 0 && b.sortVal > 0) return b.sortVal - a.sortVal; if (a.sortVal > 0) return -1; if (b.sortVal > 0) return 1; return a.value.localeCompare(b.value); }); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL' }); return o;
-            }, [yearComparisonData, modalUfFilter, fullRankedDistributors]);
-
-            const availableModalProdutos = useMemo(() => {
-                const s = new Set(); (yearComparisonData?.dataCur || []).forEach(d => { if (modalUfFilter.length > 0 && !modalUfFilter.includes(d._state)) return; if (d._product && d._product !== 'N/I') s.add(d._product); });
-                const rM = new Map(); (fullRankedProducts || []).forEach(p => rM.set(p.name, p)); const o = [];
-                s.forEach(n => { const rI = rM.get(n); if (rI && rI.qtyCur > 0) o.push({ value: String(n), label: `#${rI.rank} - ${n} (${(rI.qtyCur||0).toLocaleString('pt-BR')} un)`, sortVal: rI.qtyCur }); else o.push({ value: String(n), label: `${n} (Sem vendas)`, sortVal: -1 }); });
-                o.sort((a, b) => { if (a.sortVal > 0 && b.sortVal > 0) return b.sortVal - a.sortVal; if (a.sortVal > 0) return -1; if (b.sortVal > 0) return 1; return a.value.localeCompare(b.value); }); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL' }); return o;
-            }, [yearComparisonData, modalUfFilter, fullRankedProducts]);
-
-            const availableModalClientes = useMemo(() => {
-                const o = [];
-                (globalMetrics.allClientsRanked || []).forEach(c => {
-                    if (modalUfFilter.length > 0 && !modalUfFilter.includes(c.state)) return;
-                    if (c.fatCur > 0) {
-                        o.push({ value: c.cnpj, label: `#${c.rank} - ${c.name} ${c.cnpj ? `(${formatCnpj(c.cnpj)})` : ''} - ${formatCurrency(c.fatCur)}`, sortVal: c.fatCur });
-                    }
-                });
-                o.sort((a, b) => b.sortVal - a.sortVal); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL' }); return o;
-            }, [globalMetrics.allClientsRanked, modalUfFilter]);
 
             const detailedEntityData = useMemo(() => {
                 if (!['distribuidores', 'produtos', 'top'].includes(modalConfig.type) || !yearComparisonData) return null;
@@ -860,6 +791,157 @@
                 };
             }, [yearComparisonData, modalConfig.type, modalDistributorFilter, modalProductFilter, modalClientFilter, modalUfFilter, topDistribuidoresGlobal, topProductsGlobal, globalMetrics.allClientsRanked]);
 
+            const availableModalUfs = useMemo(() => {
+                const base = ['capilaridade','distribuidores','produtos','top','preco','analitico','abc','matriz','representatividade'].includes(modalConfig.type) ? (yearComparisonData?.dataCur || []) : activeModalDataList;
+                return [...new Set(base.map(d => d._state || d.state))].filter(Boolean).sort();
+            }, [yearComparisonData, activeModalDataList, modalConfig.type]);
+            
+            const modalUfOptionsFormatted = useMemo(() => availableModalUfs.map(u => ({label: String(u), value: String(u)})), [availableModalUfs]);
+            
+            const ufsToPlotCapilaridade = useMemo(() => {
+                const dynamicUfs = [...new Set((yearComparisonData?.dataCur || []).map(d => d._state))].filter(Boolean).sort();
+                if (!modalUfFilter.length || modalUfFilter.includes('Todos')) return dynamicUfs;
+                return Array.isArray(modalUfFilter) ? modalUfFilter : [modalUfFilter];
+            }, [yearComparisonData, modalUfFilter]);
+            
+            const isCompareUFModal = modalConfig.type === 'capilaridade' && modalUfFilter.length > 0 && modalUfFilter.length !== availableModalUfs.length;
+
+            const chartDataCapilaridade = useMemo(() => {
+                if (!data.length || modalConfig.type !== 'capilaridade') return []; 
+                const m = new Map();
+                modalDataFiltered.forEach(d => {
+                    if (!d._year || !d._month || !d.cnpj) return;
+                    const k = `${d._year}-${d._month}`;
+                    if (!m.has(k)) m.set(k, { totalSet: new Set(), ufSets: new Map(), year: d._year, month: d._month });
+                    const e = m.get(k); e.totalSet.add(d.cnpj);
+                    if (ufsToPlotCapilaridade.includes(d._state)) { if (!e.ufSets.has(d._state)) e.ufSets.set(d._state, new Set()); e.ufSets.get(d._state).add(d.cnpj); }
+                });
+                return Array.from(m.values()).filter(x => modalYearFilter === 'Todos' || x.year === Number(modalYearFilter)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.month - b.month).map(x => {
+                    const o = { name: modalYearFilter === 'Todos' ? `${MONTH_NAMES[x.month-1]}/${String(x.year).slice(-2)}` : MONTH_NAMES[x.month-1], Total: x.totalSet.size };
+                    ufsToPlotCapilaridade.forEach(u => o[u] = x.ufSets.has(u) ? x.ufSets.get(u).size : 0); return o;
+                });
+            }, [modalDataFiltered, data.length, modalConfig.type, modalYearFilter, ufsToPlotCapilaridade]);
+
+            const sortedClientsList = useMemo(() => {
+                if (modalConfig.type !== 'top' || modalClientFilter !== 'TODOS') return []; 
+                let s = [...(globalMetrics.allClientsRanked || [])];
+                if (localModalSearch) {
+                    const t = removeAccents(localModalSearch).toLowerCase().trim(); const tD = t.replace(/\D/g, '');
+                    s = s.filter(d => removeAccents(String(d.name || '').toLowerCase()).includes(t) || (tD && String(d.cnpj || '').includes(tD)) || removeAccents(String(d.city || '').toLowerCase()).includes(t));
+                }
+                if (modalUfFilter.length > 0) s = s.filter(d => modalUfFilter.includes(d.state));
+                return s.sort((a,b) => {
+                    let aV = a[clientSortConfig.column]; let bV = b[clientSortConfig.column];
+                    if (aV === null || aV === undefined) aV = -Infinity; if (bV === null || bV === undefined) bV = -Infinity;
+                    if (aV < bV) return clientSortConfig.direction === 'asc' ? -1 : 1; if (aV > bV) return clientSortConfig.direction === 'asc' ? 1 : -1; return 0;
+                });
+            }, [globalMetrics.allClientsRanked, clientSortConfig, modalConfig.type, modalClientFilter, localModalSearch, modalUfFilter]);
+
+            const availableModalDistribuidores = useMemo(() => {
+                const s = new Set(); (yearComparisonData?.dataCur || []).forEach(d => { if (modalUfFilter.length > 0 && !modalUfFilter.includes(d._state)) return; if (d._distributor && d._distributor !== 'N/I') s.add(d._distributor); });
+                const rM = new Map(); (fullRankedDistributors || []).forEach(d => rM.set(d.name, d)); const o = [];
+                s.forEach(n => { const rI = rM.get(n); if (rI && rI.curVal > 0) o.push({ value: String(n), label: `#${rI.rank} - ${n} (${formatCurrency(rI.curVal)})`, sortVal: rI.curVal }); else o.push({ value: String(n), label: `${n} (Sem vendas)`, sortVal: -1 }); });
+                o.sort((a, b) => { if (a.sortVal > 0 && b.sortVal > 0) return b.sortVal - a.sortVal; if (a.sortVal > 0) return -1; if (b.sortVal > 0) return 1; return a.value.localeCompare(b.value); }); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL' }); return o;
+            }, [yearComparisonData, modalUfFilter, fullRankedDistributors]);
+
+            const availableModalProdutos = useMemo(() => {
+                const s = new Set(); (yearComparisonData?.dataCur || []).forEach(d => { if (modalUfFilter.length > 0 && !modalUfFilter.includes(d._state)) return; if (d._product && d._product !== 'N/I') s.add(d._product); });
+                const rM = new Map(); (fullRankedProducts || []).forEach(p => rM.set(p.name, p)); const o = [];
+                s.forEach(n => { const rI = rM.get(n); if (rI && rI.qtyCur > 0) o.push({ value: String(n), label: `#${rI.rank} - ${n} (${(rI.qtyCur||0).toLocaleString('pt-BR')} un)`, sortVal: rI.qtyCur }); else o.push({ value: String(n), label: `${n} (Sem vendas)`, sortVal: -1 }); });
+                o.sort((a, b) => { if (a.sortVal > 0 && b.sortVal > 0) return b.sortVal - a.sortVal; if (a.sortVal > 0) return -1; if (b.sortVal > 0) return 1; return a.value.localeCompare(b.value); }); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL' }); return o;
+            }, [yearComparisonData, modalUfFilter, fullRankedProducts]);
+
+            const availableModalClientes = useMemo(() => {
+                const o = [];
+                (globalMetrics.allClientsRanked || []).forEach(c => {
+                    if (modalUfFilter.length > 0 && !modalUfFilter.includes(c.state)) return;
+                    if (c.fatCur > 0) {
+                        o.push({ value: c.cnpj, label: `#${c.rank} - ${c.name} ${c.cnpj ? `(${formatCnpj(c.cnpj)})` : ''} - ${formatCurrency(c.fatCur)}`, sortVal: c.fatCur });
+                    }
+                });
+                o.sort((a, b) => b.sortVal - a.sortVal); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL' }); return o;
+            }, [globalMetrics.allClientsRanked, modalUfFilter]);
+
+            const scatterPlotData = useMemo(() => {
+                if (!yearComparisonData?.dataCur && !yearComparisonData?.dataComp) return { filtered: [], avgFat: 0, thresholdG: 0 };
+                
+                const m = new Map();
+                const isClient = scatterMetric === 'clientes';
+                const kProp = scatterMetric === 'produtos' ? '_product' : scatterMetric === 'distribuidores' ? '_distributor' : 'cnpj';
+
+                const getKeyName = (d) => {
+                    let k, name;
+                    if (isClient) {
+                        k = d.cnpj || d._customerNorm || 'N/I';
+                        name = d._customer || 'N/I';
+                    } else {
+                        k = d[kProp] || 'N/I';
+                        name = d[kProp] || 'N/I';
+                    }
+                    return { k, name };
+                };
+
+                (yearComparisonData.dataCur || []).forEach(d => {
+                    const { k, name } = getKeyName(d);
+                    if (!m.has(k)) m.set(k, { name, fatCur: 0, fatComp: 0 });
+                    m.get(k).fatCur += d._amount;
+                });
+                
+                (yearComparisonData.dataComp || []).forEach(d => {
+                    const { k, name } = getKeyName(d);
+                    if (!m.has(k)) m.set(k, { name, fatCur: 0, fatComp: 0 });
+                    m.get(k).fatComp += d._amount;
+                });
+
+                let all = Array.from(m.values()).filter(x => {
+                    if (matrixShowInactive) return x.fatCur > 0 || x.fatComp > 0;
+                    return x.fatCur > 0;
+                });
+
+                if (!all.length) return { filtered: [], avgFat: 0, thresholdG: 0 };
+
+                all = all.map(x => {
+                    let g = 0;
+                    if (x.fatComp > 0) {
+                        g = ((x.fatCur - x.fatComp) / x.fatComp) * 100;
+                    } else if (x.fatCur > 0 && x.fatComp === 0) {
+                        g = 100; // Item novo s/ histórico recebe 100% de crescimento (Aposta/Estrela)
+                    } else if (x.fatCur === 0 && x.fatComp > 0) {
+                        g = -100; // Item inativo (Churn) recebe -100%
+                    }
+                    return { ...x, growth: g };
+                });
+                
+                const avgF = all.length > 0 ? (all.reduce((a,b) => a + b.fatCur, 0) / all.length) : 0;
+                const avgG = all.length > 0 ? (all.reduce((a,b) => a + b.growth, 0) / all.length) : 0;
+                const thresholdG = Math.max(0, avgG) || 0;
+
+                const sTerm = localModalSearch ? removeAccents(localModalSearch).toLowerCase().trim() : '';
+
+                let filtered = all.map(x => {
+                    let quad, fh, col, bg;
+                    if (x.fatCur >= avgF && x.growth >= thresholdG) { quad = 'Estrela'; fh = '#10b981'; col = 'text-emerald-700'; bg = 'bg-emerald-100'; }
+                    else if (x.fatCur >= avgF && x.growth < thresholdG) { quad = 'Vaca Leiteira'; fh = '#3b82f6'; col = 'text-blue-700'; bg = 'bg-blue-100'; }
+                    else if (x.fatCur < avgF && x.growth >= thresholdG) { quad = 'Aposta'; fh = '#f59e0b'; col = 'text-amber-700'; bg = 'bg-amber-100'; }
+                    else { quad = 'Abacaxi'; fh = '#ef4444'; col = 'text-rose-700'; bg = 'bg-rose-100'; }
+                    return { ...x, quadrant: quad, fillHex: fh, color: col, bg: bg };
+                });
+                
+                if (sTerm) {
+                    filtered = filtered.filter(d => removeAccents(String(d.name || '')).toLowerCase().includes(sTerm));
+                }
+                
+                const sf = filtered.sort((a,b) => {
+                    const col = matrizSortConfig.column; const dir = matrizSortConfig.direction === 'desc' ? -1 : 1;
+                    if (col === 'quadrant' || col === 'name') return String(a[col] || '').localeCompare(String(b[col] || '')) * dir;
+                    return ((a[col] || 0) - (b[col] || 0)) * dir;
+                });
+                
+                sf.forEach((item, idx) => item.rank = idx + 1);
+
+                return { filtered: sf, avgFat: avgF, thresholdG };
+            }, [yearComparisonData, matrixShowInactive, scatterMetric, matrizSortConfig, localModalSearch]);
+
             const handleExportModalExcelData = () => {
                 let dTE = []; 
                 let fN = String(modalConfig.type || 'Export').replace(/[^a-z0-9]/gi, '_').toLowerCase(); 
@@ -878,20 +960,24 @@
                         else { dTE = representatividadeDetails.opportunities.map(d => ({ 'Rank Global': d.globalRank, 'Produto': String(d.name), 'Status': String(d.status), 'Fat. Atual (R$)': fNf(d.actualFat), 'Potencial (R$)': fNf(d.gap) })); } 
                     } else { dTE = representatividadeDetails.clientList.map(d => ({ 'Rank': d.rank, 'Cliente': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Fat. Atual (R$)': fNf(d.fatCur), 'Fat. Anterior (R$)': fNf(d.fatComp), 'Crescimento (%)': d.growth !== null ? fNf(d.growth) : '' })); } 
                 } else if (modalConfig.type === 'abc') {
-                    dTE = filteredAbcList.map(d => ({ 'Rank': d.rank, 'Nome': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Faturamento (R$)': fNf(d.amount), 'Repres. (%)': fNf(d.pct), 'Acumulada (%)': fNf(d.accPct), 'Curva': String(d.curve) }));
+                    const listToExport = modalAbcFilter !== 'TODOS' ? abcDataRaw.list.filter(x => x.name === modalAbcFilter) : abcDataRaw.list;
+                    dTE = listToExport.map(d => ({ 'Rank': d.rank, 'Nome': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Faturamento (R$)': fNf(d.amount), 'Repres. (%)': fNf(d.pct), 'Acumulada (%)': fNf(d.accPct), 'Curva': String(d.curve) }));
                 } else if (['novos', 'perdidos', 'alerta'].includes(modalConfig.type) || modalConfig.type === 'top') { 
                     if (modalConfig.type === 'top' && modalClientFilter !== 'TODOS') { 
-                        // Exportação Avançada do Histórico do Cliente
-                        const clientRawData = data.filter(d => d.cnpj === modalClientFilter).sort((a,b) => b._timestamp - a._timestamp);
-                        dTE = clientRawData.map(d => ({ 'Data Transacao': String(d._displayDate), 'CNPJ': String(d.cnpj), 'Cliente': String(d._customer), 'Tipo Cliente': String(d._customerType), 'UF': String(d._state), 'Cidade': String(d._city), 'Distribuidor': String(d._distributor), 'Produto': String(d._product), 'Quantidade': fI(d._qty), 'Faturamento (R$)': fNf(d._amount), 'Preço Unitário (R$)': d._qty > 0 ? fNf(d._amount / d._qty) : '0,00' }));
-                        fN = `historico_detalhado_${modalClientFilter}`;
-                    } else { dTE = (modalConfig.type === 'top' ? sortedClientsList : filteredModalDataList).map((d,i) => ({ 'Rank': i + 1, 'Cliente': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Fat. Atual (R$)': fNf(d.fatCur), 'Fat. Anterior (R$)': fNf(d.fatComp), 'Crescimento (%)': d.growth !== null ? fNf(d.growth) : '', 'Média Mensal (R$)': d.mediaMensal ? fNf(d.mediaMensal) : '', 'Atraso (Meses)': d.atraso ? fI(d.atraso) : '' })); } 
+                        const dists = modalEvolucaoMode === 'faturamento' ? detailedEntityData.topDistributorsFat : detailedEntityData.topDistribuidoresQty;
+                        dTE = dists.map((c,i) => ({ 'Rank': i + 1, 'Distribuidor': String(c.name), 'Faturamento (R$)': fNf(c.valor), 'Quantidade': fI(c.qty), 'Repres. (%)': fNf((c.valor / detailedEntityData.curTotal) * 100) }));
+                        fN = `distribuidores_cliente_${modalClientFilter}`;
+                    } else { 
+                        const sourceList = modalConfig.type === 'top' ? sortedClientsList : filteredModalDataList;
+                        dTE = sourceList.map((d,i) => ({ 'Rank': i + 1, 'Cliente': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Fat. Atual (R$)': fNf(d.fatCur), 'Fat. Anterior (R$)': fNf(d.fatComp), 'Crescimento (%)': d.growth !== null ? fNf(d.growth) : '', 'Média Mensal (R$)': d.mediaMensal ? fNf(d.mediaMensal) : '', 'Atraso (Meses)': d.atraso ? fI(d.atraso) : '' })); 
+                    } 
                 } else if (modalConfig.type === 'preco') {
-                    dTE = modalProdutosData.map(p => ({ 'Produto': String(p.name), 'Qtd Vendida': fI(p.qty), 'Faturamento Total (R$)': fNf(p.amount), 'Menor Preço (R$)': fNf(p.min), 'Preço Médio (R$)': fNf(p.avg), 'Último Preço (R$)': fNf(p.lastPrice), 'Data Menor': String(p.minDate || ''), 'Data Último': String(p.lastDateLabel || '') }));
+                    dTE = modalPrecosData.map(p => ({ 'Produto': String(p.name), 'Qtd Vendida': fI(p.qty), 'Faturamento Total (R$)': fNf(p.amount), 'Menor Preço (R$)': fNf(p.min), 'Preço Médio (R$)': fNf(p.avg), 'Último Preço (R$)': fNf(p.lastPrice), 'Data Menor': String(p.minDate || ''), 'Data Último': String(p.lastDateLabel || '') }));
                 } else if (['distribuidores', 'produtos'].includes(modalConfig.type)) {
-                    const clients = modalEvolucaoMode === 'faturamento' ? detailedEntityData.topClientsFat : detailedEntityData.topClientsQty; dTE = clients.map((c,i) => ({ 'Rank': i + 1, 'Cliente': String(c.name), 'Tipo Cliente': String(c.customerType), 'UF': String(c.state), 'Cidade': String(c.city), 'Faturamento (R$)': fNf(c.valor), 'Quantidade': fI(c.qty), 'Repres. (%)': fNf((c.valor / detailedEntityData.curTotal) * 100) }));
+                    const clients = modalEvolucaoMode === 'faturamento' ? detailedEntityData.topClientsFat : detailedEntityData.topClientsQty; 
+                    dTE = clients.map((c,i) => ({ 'Rank': i + 1, 'Cliente': String(c.name), 'Tipo Cliente': String(c.customerType), 'UF': String(c.state), 'Cidade': String(c.city), 'Faturamento (R$)': fNf(c.valor), 'Quantidade': fI(c.qty), 'Repres. (%)': fNf((c.valor / detailedEntityData.curTotal) * 100) }));
                 } else if (modalConfig.type === 'capilaridade') {
-                     dTE = chartDataCapilaridade.map(d => { const o = {'Período': String(d.name), 'Total (PDVs)': d.Total}; ufsToPlotCapilaridade.forEach(u => o[u] = d[u]); return o; });
+                     dTE = [{'Aviso': 'Visão gráfica apenas'}];
                 }
                 exportToExcel(dTE, fN);
             };
@@ -914,7 +1000,7 @@
 
             const getModalBadge = () => {
                 if (['novos', 'perdidos', 'alerta'].includes(modalConfig.type)) return `${filteredModalDataList.length.toLocaleString('pt-BR')} clientes`;
-                if (modalConfig.type === 'preco') return `${modalProdutosData.length.toLocaleString('pt-BR')} produtos`;
+                if (modalConfig.type === 'preco') return `${modalPrecosData.length.toLocaleString('pt-BR')} produtos`;
                 if (modalConfig.type === 'analitico') return `${modalDataFiltered.length.toLocaleString('pt-BR')} linhas`;
                 if (modalConfig.type === 'matriz') return `${scatterPlotData.filtered.length.toLocaleString('pt-BR')} itens`;
                 if (modalConfig.type === 'representatividade' && representatividadeDetails && !representatividadeDetails.isOverview) {
@@ -975,6 +1061,7 @@
                 }
 
                 if (modalConfig.type === 'abc' && abcDataRaw) {
+                    const listABC = modalAbcFilter !== 'TODOS' ? abcDataRaw.list.filter(x => x.name === modalAbcFilter) : abcDataRaw.list;
                     const colsABC = [ 
                         {label:'Rank', align:'text-center', val:r=><span className="text-slate-400 font-bold">{"#" + String(r.rank)}</span>}, 
                         {label:abcDimension==='clientes'?'Cliente':'Produto', val:r=><div className="text-slate-800 font-bold truncate max-w-[200px]">{String(r.name)}</div>}, 
@@ -1078,7 +1165,7 @@
                     ];
 
                     const isClientRank = modalConfig.type === 'top' && modalClientFilter === 'TODOS'; 
-                    const isClientDist = modalConfig.type === 'top' && modalClientFilter !== 'TODOS';
+                    const isClientSelected = modalConfig.type === 'top' && modalClientFilter !== 'TODOS';
                     
                     const colsRank = isClientRank ? [ 
                         {label:'Rank', align:'text-center', val:r=><span className="text-slate-400 font-bold">{"#" + String(r.rank)}</span>}, 
@@ -1091,7 +1178,7 @@
                             const g = isF ? r.growth : r.growthQty;
                             return g!==null&&g!==undefined?<span className={`px-2 py-0.5 rounded text-[8px] font-bold ${g>0?'bg-emerald-50 text-emerald-600':g<0?'bg-rose-50 text-rose-600':'bg-slate-50 text-slate-600'}`}>{g>0?'+':''}{Number(g || 0).toFixed(1)}%</span>:<span className="text-slate-400">-</span>
                         }, sort:()=>setClientSortConfig(p=>({column:isF?'growth':'growthQty',direction:p.column===(isF?'growth':'growthQty')&&p.direction==='desc'?'asc':'desc'})), activeSort:clientSortConfig.column===(isF?'growth':'growthQty'), sortDir:clientSortConfig.direction} 
-                    ] : isClientDist ? [ 
+                    ] : isClientSelected ? [ 
                         {label:'Distribuidor', val:r=><div className="font-bold text-slate-700">{String(r.name)}</div>}, 
                         {label:'Faturamento', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>}, 
                         {label:'Qtd.', align:'text-right', val:r=><span className="font-bold text-slate-600">{Number(r.qty)} un</span>}, 
@@ -1120,19 +1207,27 @@
                                     </div>
                                 ))}
                             </div>
+                            
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                 <MiniLineChart data={d.monthlyTrend} isFat={isF} setMode={setModalEvolucaoMode}/>
                                 <MiniBarChart data={modalConfig.type === 'produtos' ? (isF ? d.topDistributorsFat : d.topDistribuidoresQty) : (isF ? d.topProductsFat : d.topProductsQty)} color={modalConfig.type === 'produtos' ? "#10b981" : "#3b82f6"} isFat={isF} title={modalConfig.type === 'produtos' ? 'Top Distribuidores' : 'Top Produtos'}/>
                             </div>
+
                             <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
-                                <h4 className="text-[9px] font-black text-slate-800 uppercase p-3 bg-slate-50 border-b border-slate-100">{isClientRank ? 'Ranking de Clientes' : isClientDist ? 'Distribuidores do Cliente' : 'Principais Compradores'}</h4>
-                                <DataTable cols={colsRank} data={isClientRank ? sortedClientsList.slice(0, 100) : (isClientDist ? (isF ? d.topDistributorsFat : d.topDistribuidoresQty) : (isF ? d.topClientsFat : d.topClientsQty).slice(0, 100))} />
+                                <h4 className="text-[9px] font-black text-slate-800 uppercase p-3 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5">
+                                    {isClientRank ? 'Ranking de Clientes' : isClientSelected ? <><Icon name="Truck" size={14}/>Relacionamento com Distribuidores</> : 'Principais Compradores'}
+                                </h4>
+                                <DataTable cols={colsRank} data={isClientRank ? sortedClientsList.slice(0, 100) : isClientSelected ? (isF ? d.topDistributorsFat : d.topDistribuidoresQty) : (isF ? d.topClientsFat : d.topClientsQty).slice(0, 100)} />
                             </div>
                         </div>
                     );
                 }
 
                 if (modalConfig.type === 'analitico') {
+                    const totalAnaliticoQtd = modalDataFiltered.reduce((a,d) => a + (Number(d._qty) || 0), 0);
+                    const totalAnaliticoFat = modalDataFiltered.reduce((a,d) => a + (Number(d._amount) || 0), 0);
+                    const precoMedioAnalitico = totalAnaliticoQtd > 0 ? totalAnaliticoFat / totalAnaliticoQtd : 0;
+                    
                     const colsAn = [ 
                         {label:'DATA', val:r=><span className="font-bold text-slate-800">{String(r._displayDate)}</span>, sort:()=>setAnaliticoSortConfig(p=>({column:'data',direction:p.column==='data'&&p.direction==='desc'?'asc':'desc'})), activeSort:analiticoSortConfig.column==='data', sortDir:analiticoSortConfig.direction}, 
                         {label:'CNPJ', val:r=><span className="text-slate-500">{String(r.cnpj)}</span>}, 
@@ -1184,6 +1279,121 @@
                                     {ufsToPlotCapilaridade.map((u, i) => <Line key={String(u)} type="monotone" dataKey={String(u)} name={String(u)} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={{r:2, strokeWidth:1}} activeDot={{r:4}} connectNulls={false} />)}
                                 </LineChart>
                             </ResponsiveContainer>
+                        </div>
+                    );
+                }
+
+                if (modalConfig.type === 'manual') {
+                    const tabs = [
+                        { id: 'conceitos', label: 'CONCEITOS' },
+                        { id: 'kpis', label: 'MÉTRICAS (KPIS)' },
+                        { id: 'graficos', label: 'VISÕES DO DASHBOARD' },
+                        { id: 'estrategia', label: 'MATRIZ ESTRATÉGICA' }
+                    ];
+                    return (
+                        <div className="p-4 lg:p-6 bg-white space-y-6 max-w-5xl mx-auto animate-fade-in">
+                            <div className="flex border-b border-slate-200 mb-6 sticky top-0 bg-white z-10 overflow-x-auto custom-scroll">
+                                {tabs.map(t => (
+                                    <button key={t.id} onClick={() => setActiveManualTab(t.id)} className={`px-4 lg:px-6 py-3 text-[10px] font-black tracking-widest border-b-2 transition-all whitespace-nowrap ${activeManualTab === t.id ? 'border-blue-600 text-blue-700 bg-blue-50/50' : 'border-transparent text-slate-400 hover:text-slate-800 hover:bg-slate-50'}`}>
+                                        {t.label}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            {activeManualTab === 'conceitos' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                        <h4 className="text-xs font-black text-blue-800 mb-2 flex items-center gap-1.5"><Icon name="Clock" size={14}/>Visão YTD (Year-to-Date)</h4>
+                                        <p className="text-[10px] text-slate-600 leading-relaxed">Analisa o desempenho acumulado desde o primeiro dia do ano atual até a data de hoje, comparando exatamente com o mesmo intervalo de tempo do ano anterior. Fundamental para avaliar a meta anual.</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                        <h4 className="text-xs font-black text-indigo-800 mb-2 flex items-center gap-1.5"><Icon name="Clock" size={14}/>Visão UDM (Últimos 12 Meses)</h4>
+                                        <p className="text-[10px] text-slate-600 leading-relaxed">Avalia uma janela móvel dos últimos 12 meses fechados. Ao remover a sazonalidade de meses atípicos, revela a verdadeira tendência de crescimento sustentável da carteira.</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 shadow-sm">
+                                        <h4 className="text-xs font-black text-fuchsia-800 mb-2 flex items-center gap-1.5"><Icon name="Clock" size={14}/>Visão U6M (Últimos 6 Meses)</h4>
+                                        <p className="text-[10px] text-slate-600 leading-relaxed">Avalia a tração de curto prazo do negócio. Compara as vendas dos últimos 6 meses com o semestre imediatamente anterior, capturando tendências e choques recentes no mercado.</p>
+                                    </div>
+                                    <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-200 shadow-sm">
+                                        <h4 className="text-xs font-black text-emerald-800 mb-2 flex items-center gap-1.5"><Icon name="Package" size={14}/>White Space (Oportunidades)</h4>
+                                        <p className="text-[10px] text-emerald-700 leading-relaxed">É a identificação de "espaços em branco". Revela quais clientes ativos já têm relacionamento e faturamento consigo, mas que ainda não consomem produtos específicos do seu portefólio (Cross-sell).</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeManualTab === 'kpis' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                        <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center shrink-0 shadow-inner"><Icon name="TrendingUp" size={20}/></div>
+                                        <div><h5 className="text-[11px] font-black text-slate-800 uppercase">Faturamento</h5><p className="text-[9px] text-slate-500 mt-1">Receita total gerada no período. O crescimento compara o valor atual contra o período exato anterior.</p></div>
+                                    </div>
+                                    <div className="flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center shrink-0 shadow-inner"><Icon name="Users" size={20}/></div>
+                                        <div><h5 className="text-[11px] font-black text-slate-800 uppercase">Capilaridade (PDVs)</h5><p className="text-[9px] text-slate-500 mt-1">Quantidade de CNPJs únicos que realizaram compras. Demonstra a saúde e amplitude de distribuição da rede.</p></div>
+                                    </div>
+                                    <div className="flex gap-4 items-start p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                        <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center shrink-0 shadow-inner"><Icon name="MapPin" size={20}/></div>
+                                        <div><h5 className="text-[11px] font-black text-slate-800 uppercase">Ticket e Preço Médio</h5><p className="text-[9px] text-slate-500 mt-1"><b>Ticket Médio:</b> Gasto médio por CNPJ. <b>Preço Médio:</b> Valor médio cobrado por unidade de produto.</p></div>
+                                    </div>
+                                    <div className="flex gap-4 items-start p-4 bg-emerald-50 rounded-xl border border-emerald-200 shadow-sm">
+                                        <div className="w-10 h-10 bg-emerald-500 text-white rounded-lg flex items-center justify-center shrink-0 shadow-md"><Icon name="UserPlus" size={20}/></div>
+                                        <div><h5 className="text-[11px] font-black text-emerald-900 uppercase">Clientes Novos</h5><p className="text-[9px] text-emerald-700 mt-1">Clientes que compraram no período atual, mas que não tinham nenhum histórico de compra no período anterior.</p></div>
+                                    </div>
+                                    <div className="flex gap-4 items-start p-4 bg-rose-50 rounded-xl border border-rose-200 shadow-sm">
+                                        <div className="w-10 h-10 bg-rose-500 text-white rounded-lg flex items-center justify-center shrink-0 shadow-md"><Icon name="UserMinus" size={20}/></div>
+                                        <div><h5 className="text-[11px] font-black text-rose-900 uppercase">Clientes Perdidos (Churn)</h5><p className="text-[9px] text-rose-700 mt-1">Sinal vermelho. Clientes que registraram faturamento no período anterior, mas que estão com 0 compras no período atual.</p></div>
+                                    </div>
+                                    <div className="flex gap-4 items-start p-4 bg-amber-50 rounded-xl border border-amber-200 shadow-sm">
+                                        <div className="w-10 h-10 bg-amber-500 text-white rounded-lg flex items-center justify-center shrink-0 shadow-md"><Icon name="AlertCircle" size={20}/></div>
+                                        <div><h5 className="text-[11px] font-black text-amber-900 uppercase">Em Alerta</h5><p className="text-[9px] text-amber-700 mt-1">Clientes ainda ativos no período atual, mas que já não compram há mais de 2 meses. Risco iminente de Churn.</p></div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeManualTab === 'graficos' && (
+                                <div className="space-y-4">
+                                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <h4 className="text-[11px] font-black text-slate-800 uppercase mb-1 flex items-center gap-2"><Icon name="TrendingUp" className="text-blue-600"/> Evolução Mensal</h4>
+                                        <p className="text-[10px] text-slate-600 mb-2">Exibe as curvas de faturamento e volume vendidas mês a mês. Permite sobrepor os anos para descobrir sazonalidades e ver a linha média global.</p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <h4 className="text-[11px] font-black text-slate-800 uppercase mb-1 flex items-center gap-2"><Icon name="MapPin" className="text-emerald-600"/> Representatividade (Treemap)</h4>
+                                        <p className="text-[10px] text-slate-600 mb-2">Gráfico de blocos interativo. Facilita a visualização do peso de UFs, Cidades ou Tipos de Clientes. O botão "Raio-X" liberta a matriz de White Space para cruzamento de produtos contra regiões.</p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <h4 className="text-[11px] font-black text-slate-800 uppercase mb-1 flex items-center gap-2"><Icon name="Target" className="text-indigo-600"/> Curva ABC (Pareto)</h4>
+                                        <p className="text-[10px] text-slate-600 mb-2">Classifica produtos ou clientes pela regra 80/20. Curva A (vital para o faturamento), Curva B (manutenção) e Curva C (baixo impacto, avalie o esforço).</p>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                        <h4 className="text-[11px] font-black text-slate-800 uppercase mb-1 flex items-center gap-2"><Icon name="List" className="text-slate-600"/> Visão Analítica (Raw Data)</h4>
+                                        <p className="text-[10px] text-slate-600 mb-2">Painel de auditoria. Exibe exatamente os dados processados linha a linha, com flexibilidade de exportação integral de faturas e quantidades para Excel.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeManualTab === 'estrategia' && (
+                                <div className="space-y-4">
+                                    <p className="text-[10px] text-slate-600 mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">A <b>Matriz de Performance</b> distribui a sua base num gráfico onde o Eixo X é o % de Crescimento e o Eixo Y é o Faturamento (R$). O painel divide automaticamente o ecrã em 4 quadrantes cruzando as médias atuais.</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[10px]">
+                                        <div className="p-5 border border-emerald-200 bg-emerald-50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 bg-emerald-500 rounded-sm"></div><h4 className="font-black text-emerald-800 text-[11px] uppercase">Estrelas</h4></div>
+                                            <p className="text-emerald-700 leading-relaxed"><b>Alta Faturação + Alto Crescimento.</b> São os motores atuais do negócio. <br/><br/><b>Estratégia:</b> Assegurar o nível de serviço (SLA), garantir disponibilidade de estoque e proteger agressivamente de qualquer assédio da concorrência.</p>
+                                        </div>
+                                        <div className="p-5 border border-blue-200 bg-blue-50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 bg-blue-500 rounded-sm"></div><h4 className="font-black text-blue-800 text-[11px] uppercase">Vacas Leiteiras</h4></div>
+                                            <p className="text-blue-700 leading-relaxed"><b>Alta Faturação + Baixo Crescimento (ou Queda).</b> São clientes massivos que pararam de crescer, muitas vezes porque já foram capitalizados pela concorrência em novas linhas.<br/><br/><b>Estratégia:</b> Focar no relacionamento e usar o "White Space" para lhes vender novos produtos.</p>
+                                        </div>
+                                        <div className="p-5 border border-amber-200 bg-amber-50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 bg-amber-500 rounded-sm"></div><h4 className="font-black text-amber-800 text-[11px] uppercase">Apostas</h4></div>
+                                            <p className="text-amber-700 leading-relaxed"><b>Baixa Faturação + Alto Crescimento.</b> Pequenos clientes/produtos que estão a acelerar mais rápido do que a média de mercado.<br/><br/><b>Estratégia:</b> Treinar o comercial para impulsionar estes clientes. São os talentos do futuro e as futuras Estrelas do seu portefólio.</p>
+                                        </div>
+                                        <div className="p-5 border border-rose-200 bg-rose-50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 bg-rose-500 rounded-sm"></div><h4 className="font-black text-rose-800 text-[11px] uppercase">Abacaxis</h4></div>
+                                            <p className="text-rose-700 leading-relaxed"><b>Baixa Faturação + Baixo Crescimento.</b> Consomem tempo operacional sem garantir retorno à empresa.<br/><br/><b>Estratégia:</b> Reduzir custo de visita física. Avaliar automação do atendimento (via portal ou telefone) ou mesmo o desinvestimento caso não tenham potencial regional.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 }
@@ -1270,289 +1480,274 @@
             );
 
             return (
-                <div id="main-dashboard-export-area" className="max-w-[1600px] mx-auto p-2 lg:p-3 text-slate-900 flex flex-col gap-1.5">
-                    {/* Modal de Raio-X */}
-                    {modalConfig.isOpen && (
-                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 lg:p-4">
-                            <div id="modal-export-area" className="bg-white rounded-2xl w-full max-w-5xl flex flex-col shadow-2xl overflow-hidden" style={{maxHeight: '95vh'}}>
-                                <div className="p-3 lg:p-4 border-b border-slate-100 flex flex-col bg-slate-50 gap-2 shrink-0">
-                                    <div className="flex justify-between items-start md:items-center w-full flex-wrap gap-3">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${['novos','distribuidores'].includes(modalConfig.type)?'text-emerald-600 bg-emerald-100':['perdidos'].includes(modalConfig.type)?'text-rose-600 bg-rose-100':['top'].includes(modalConfig.type)?'text-fuchsia-600 bg-fuchsia-100':['alerta'].includes(modalConfig.type)?'text-amber-600 bg-amber-100':['preco','produtos','matriz','representatividade'].includes(modalConfig.type)?'text-blue-600 bg-blue-100':['abc'].includes(modalConfig.type)?'text-indigo-600 bg-indigo-100':'text-slate-600 bg-slate-100'}`}>
-                                                <Icon name={modalConfig.type === 'novos' ? 'UserPlus' : modalConfig.type === 'perdidos' ? 'UserMinus' : modalConfig.type === 'top' ? 'Users' : modalConfig.type === 'alerta' ? 'AlertCircle' : modalConfig.type === 'capilaridade' ? 'TrendingUp' : modalConfig.type === 'preco' ? 'Package' : modalConfig.type === 'produtos' ? 'Package' : modalConfig.type === 'distribuidores' ? 'Truck' : modalConfig.type === 'analitico' ? 'List' : modalConfig.type === 'abc' ? 'Target' : modalConfig.type === 'manual' ? 'BookOpen' : modalConfig.type === 'matriz' ? 'Target' : 'MapPin'} size={20}/>
-                                            </div>
-                                            <div>
-                                                <h2 className="text-lg font-black text-slate-800">{
-                                                    modalConfig.type === 'novos' ? `Clientes Novos (${timeMode})` :
-                                                    modalConfig.type === 'perdidos' ? `Clientes Perdidos (${timeMode})` :
-                                                    modalConfig.type === 'top' ? `Raio-X do Cliente` :
-                                                    modalConfig.type === 'alerta' ? `Clientes Em Alerta` :
-                                                    modalConfig.type === 'capilaridade' ? `Evolução de Capilaridade` :
-                                                    modalConfig.type === 'preco' ? `Análise de Preços` :
-                                                    modalConfig.type === 'produtos' ? `Raio-X do Produto` :
-                                                    modalConfig.type === 'distribuidores' ? `Raio-X do Distribuidor` :
-                                                    modalConfig.type === 'analitico' ? `Visão Analítica (Raw Data)` :
-                                                    modalConfig.type === 'abc' ? `Análise de Concentração (Curva ABC)` :
-                                                    modalConfig.type === 'manual' ? `Manual e Metodologia` :
-                                                    modalConfig.type === 'matriz' ? `Raio-X da Matriz de Performance` :
-                                                    modalConfig.type === 'representatividade' ? (['UF', 'Cidade', 'Distribuidor'].includes(pieChartMetric) ? `Oportunidades de Mix (White Space)` : `Raio-X de Segmento: ${pieChartMetric}`) : ''
-                                                }</h2>
-                                                <p className="text-[10px] font-bold text-slate-500">{
-                                                    modalConfig.type === 'top' && modalClientFilter !== 'TODOS' && detailedEntityData && detailedEntityData.entityCnpj ? `${detailedEntityData.entityName} (CNPJ: ${formatCnpj(detailedEntityData.entityCnpj)})` :
-                                                    modalConfig.type === 'top' ? `Comportamento, Tração e Mix de Produtos` :
-                                                    modalConfig.type === 'analitico' ? `Detalhamento linha a linha da seleção atual` :
-                                                    modalConfig.type === 'representatividade' ? (['UF', 'Cidade', 'Distribuidor'].includes(pieChartMetric) ? `Identificação de produtos sem penetração neste segmento` : `Análise de faturamento e carteira deste segmento`) :
-                                                    `Detalhamento da métrica selecionada`
-                                                }</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-end gap-2 flex-wrap">
-                                            {['distribuidores','produtos','top','abc'].includes(modalConfig.type) ? (
-                                                <div className="flex flex-col gap-0.5 min-w-[180px]">
-                                                    <CustomSelect label={ modalConfig.type==='distribuidores'?'Distribuidor':modalConfig.type==='produtos'?'Produto':modalConfig.type==='abc'?(abcDimension==='clientes'?'Cliente':'Produto'):'Cliente' } options={ modalConfig.type==='distribuidores'?availableModalDistribuidores:modalConfig.type==='produtos'?availableModalProdutos:modalConfig.type==='abc'?abcOptions:availableModalClientes } selected={ modalConfig.type==='distribuidores'?modalDistributorFilter:modalConfig.type==='produtos'?modalProductFilter:modalConfig.type==='abc'?modalAbcFilter:modalClientFilter } onChange={v=>{ if(modalConfig.type==='distribuidores')setModalDistributorFilter(v); else if(modalConfig.type==='produtos')setModalProductFilter(v); else if(modalConfig.type==='top')setModalClientFilter(v); else if(modalConfig.type==='abc')setModalAbcFilter(v); }} placeholder="Pesquisar..." searchable={true} />
-                                                </div>
-                                            ) : modalConfig.type === 'representatividade' ? (
-                                                <div className="flex flex-col gap-0.5 min-w-[180px]">
-                                                    <CustomSelect label={`Selecionar ${pieChartMetric}`} options={representatividadeDetails?.options || []} selected={modalRepFilter} onChange={(v)=>{setModalRepFilter(v); setSelectedOpportunity(null);}} placeholder="Pesquisar..." searchable={true} />
-                                                </div>
-                                            ) : !['abc','manual'].includes(modalConfig.type) ? (
-                                                <div className="flex gap-2">
-                                                    {['capilaridade','preco','analitico'].includes(modalConfig.type) && (
-                                                        <div className="flex flex-col gap-0.5 min-w-[90px]">
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Ano</label>
-                                                            <div className="relative">
-                                                                <select value={modalYearFilter} onChange={e=>setModalYearFilter(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 shadow-sm appearance-none h-[28px]">
-                                                                    <option value="Todos">Todos</option>
-                                                                    {allAvailableYears.map(y=><option key={String(y)} value={String(y)}>{y}</option>)}
-                                                                </select>
-                                                                <Icon name="ChevronDown" size={12} className="absolute right-2 top-2 text-slate-400 pointer-events-none"/>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    <div className="min-w-[130px]">
-                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Buscar Livre</label>
-                                                        <DebouncedInput value={localModalSearch} onChange={setLocalModalSearch} placeholder="Filtrar..." icon="Search"/>
-                                                    </div>
-                                                </div>
-                                            ) : null}
-
-                                            {!['abc','manual','matriz','representatividade'].includes(modalConfig.type) && (
-                                                <CustomMultiSelect label="Filtrar UF" options={modalUfOptionsFormatted} selected={modalUfFilter} onChange={setModalUfFilter} placeholder="Todas" searchable={true} />
-                                            )}
-
-                                            <div className="flex items-end gap-1.5 h-[28px]">
-                                                {getModalBadge() && <div className="flex items-center h-full px-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-100 text-[10px] font-bold no-export shadow-sm">{String(getModalBadge())}</div>}
-                                                {modalConfig.type === 'representatividade' && representatividadeDetails && !representatividadeDetails.isOverview && ['UF', 'Cidade', 'Distribuidor'].includes(pieChartMetric) && (
-                                                    <div className="flex items-center h-full px-3 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 text-[10px] font-bold no-export shadow-sm">Potencial: +{formatCurrency(representatividadeDetails.totalGap)}</div>
-                                                )}
-                                                {modalConfig.type !== 'manual' && (
-                                                    <button onClick={handleExportModalExcelData} className="h-full px-3 bg-emerald-50 text-emerald-700 rounded-lg flex items-center justify-center hover:bg-emerald-100 text-[10px] font-bold gap-1 shadow-sm border border-emerald-100 ml-1" title="Exportar dados para Excel">
-                                                        <Icon name="FileSpreadsheet" size={12}/> Excel {modalConfig.type === 'top' && modalClientFilter !== 'TODOS' ? 'Completo' : ''}
-                                                    </button>
-                                                )}
-                                                <button onClick={()=>setModalConfig({isOpen:false, type:null})} className="w-[28px] h-full bg-white border border-slate-200 rounded-lg flex items-center justify-center hover:text-rose-500 shadow-sm ml-1">
-                                                    <Icon name="X" size={14}/>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        
-                                        {(localModalSearch || modalUfFilter.length > 0) && !['abc','manual'].includes(modalConfig.type) && (
-                                            <div className="flex items-center gap-2 mt-1 w-full pt-1.5 border-t border-slate-100">
-                                                <span className="text-[8px] font-black text-slate-400 flex items-center gap-1"><Icon name="Filter" size={10} /> FILTROS ATIVOS:</span>
-                                                {localModalSearch && <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded text-[8px] font-bold shadow-sm">BUSCA CLI.: "{localModalSearch}"</span>}
-                                                {modalUfFilter.length > 0 && <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded text-[8px] font-bold shadow-sm">UF: {modalUfFilter.join(', ')}</span>}
-                                            </div>
-                                        )}
+                <div id="main-dashboard-export-area" className={`max-w-[1600px] mx-auto p-2 lg:p-3 text-slate-900 flex flex-col gap-1.5 ${modalConfig.isOpen ? 'has-modal' : ''} ${isPdfMode ? 'pdf-mode' : ''}`}>
+                    <div className={modalConfig.isOpen ? 'print:hidden' : ''}>
+                        {/* Cabeçalho Principal do Dashboard */}
+                        <div className="bg-white p-2 lg:p-3 rounded-xl border border-slate-200 shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-1.5">
+                            <div className="flex items-center gap-3">
+                                <div className="relative w-10 h-10 shrink-0">
+                                    <img 
+                                        src="youyou.webp" 
+                                        alt="Mascote YouYou" 
+                                        className="absolute inset-0 w-10 h-10 object-contain drop-shadow-md bg-white rounded-full border border-slate-200 p-0.5 z-10" 
+                                        onError={(e) => { 
+                                            e.target.onerror = null; 
+                                            e.target.style.display = 'none'; 
+                                        }} 
+                                    />
+                                    <div className="absolute inset-0 w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center border border-indigo-200 shadow-inner z-0">
+                                        <Icon name="TrendingUp" size={18} className="text-indigo-600"/>
                                     </div>
                                 </div>
-                                <div className="p-0 overflow-y-auto modal-scroll flex-1 bg-slate-50/50">
+                                <div>
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                        <div className="w-1 h-4 bg-blue-600 rounded-full shadow-sm"></div>
+                                        <h1 className="text-base font-black tracking-tight text-slate-800 uppercase leading-none whitespace-nowrap">Performance Comercial</h1>
+                                    </div>
+                                    <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest ml-2.5">Dashboard Sellout {currentUser && <span className="text-blue-500 font-black normal-case tracking-normal ml-1">&bull; {String(currentUser.nome.split(' ')[0])}</span>}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner no-export">
+                                <button onClick={()=>setTimeMode('U6M')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded-md transition-all shadow-sm ${timeMode==='U6M'?'bg-white text-blue-700':'text-slate-500 hover:text-slate-700'}`}>U6M</button>
+                                <button onClick={()=>setTimeMode('UDM')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded-md transition-all shadow-sm ${timeMode==='UDM'?'bg-white text-blue-700':'text-slate-500 hover:text-slate-700'}`}>UDM</button>
+                                <button onClick={()=>setTimeMode('YTD')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded-md transition-all shadow-sm ${timeMode==='YTD'?'bg-white text-blue-700':'text-slate-500 hover:text-slate-700'}`}>YTD</button>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap no-export">
+                                {lastUpdate && <div className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 shadow-sm px-2 py-1 rounded-lg flex items-center gap-1"><Icon name="Clock" size={10} className="text-slate-400" /> Atualizado: <span className="text-slate-700">{String(lastUpdate)}</span></div>}
+                                <button onClick={()=>openModal('manual')} className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-blue-100 shadow-sm" title="Manual de Uso"><Icon name="BookOpen" size={10}/> Manual</button>
+                                <button onClick={exportToPDF} className="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-rose-100 shadow-sm" title="Salvar Tela em PDF"><Icon name="Download" size={10}/> PDF</button>
+                                <button onClick={handleExportMainExcel} className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-emerald-100 shadow-sm" title="Exportar Tabela Global"><Icon name="FileSpreadsheet" size={10}/> Excel</button>
+                                <button onClick={()=>openModal('abc')} className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-indigo-100 shadow-sm" title="Ver Curva ABC"><Icon name="Target" size={10}/> Curva ABC</button>
+                                <button onClick={()=>openModal('analitico')} className="flex items-center gap-1 bg-white text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-slate-50 shadow-sm" title="Visão Analítica (Raw Data)"><Icon name="List" size={10}/> Analítico</button>
+                                <button onClick={()=>{setShowUploadScreen(true);setIsLoaded(false);}} className="flex items-center gap-1 bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-black shadow-sm" title="Carregar Nova Base CSV"><Icon name="Upload" size={10}/> CSV</button>
+                                <button onClick={()=>{setShowUploadScreen(true);setIsLoaded(false);setCurrentUser(null);setPasswordValue('');setIsAdminVerified(false);}} className="flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 shadow-sm" title="Sair do Sistema"><Icon name="UserMinus" size={10}/> Sair</button>
+                            </div>
+                        </div>
+
+                        {/* Filtros */}
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-md flex flex-wrap gap-2 items-end mb-1.5 no-export">
+                            <div className="flex-[1.5] min-w-[120px]"><DebouncedInput value={filters.searchCustomer} onChange={v => setFilters({...filters, searchCustomer: v})} placeholder="Nome/CNPJ..." icon="Search" /></div>
+                            <div className="flex-[1.5] min-w-[120px]"><DebouncedInput value={filters.searchProduct} onChange={v => setFilters({...filters, searchProduct: v})} placeholder="Produto..." icon="Package" /></div>
+                            <CustomMultiSelect label="Anos" options={availableOptions.years} selected={filters.years} onChange={v => setFilters({...filters, years: v})} placeholder="Todos" searchable={true} />
+                            <CustomMultiSelect label="Meses" options={availableOptions.months} selected={filters.months} onChange={v => setFilters({...filters, months: v})} placeholder="Todos" searchable={true} />
+                            <CustomMultiSelect label="Estado" options={availableOptions.states} selected={filters.state} onChange={v => setFilters({...filters, state: v})} placeholder="Todos" searchable={true} />
+                            <CustomMultiSelect label="Cidade" options={availableOptions.cities} selected={filters.city} onChange={v => setFilters({...filters, city: v})} placeholder="Todas" searchable={true} />
+                            <CustomMultiSelect label="Distribuidor" options={availableOptions.distributors} selected={filters.distributor} onChange={v => setFilters({...filters, distributor: v})} placeholder="Todos" searchable={true} />
+                            <CustomMultiSelect label="Tipo Cliente" options={availableOptions.customerTypes} selected={filters.customerType} onChange={v => setFilters({...filters, customerType: v})} placeholder="Todos" searchable={true} />
+                            <CustomMultiSelect label="Unidade" options={availableOptions.types} selected={filters.type} onChange={v => setFilters({...filters, type: v})} placeholder="Todas" searchable={true} />
+                            
+                            <div className="flex flex-col justify-end pb-0.5">
+                                <button onClick={() => initialFilters && setFilters(initialFilters)} className="px-3 h-[24px] bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 text-[8px] font-bold rounded border border-slate-200 transition-colors flex items-center gap-1 shadow-sm" title="Limpar todos os filtros">
+                                    <Icon name="X" size={10} /> Limpar
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* KPIs */}
+                        <div className="grid grid-cols-3 xl:grid-cols-6 gap-2 mb-1.5">
+                            <KPICard title="Faturamento" metricKey="fatCur" growthKey="fatGrowth" icon="TrendingUp" color="slate" met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isCurrency={true} />
+                            <KPICard title={priceKpiMode === 'preco' ? 'Preço Médio' : 'Ticket Médio'} metricKey={priceKpiMode === 'preco' ? 'precoMedioCur' : 'ticketMedioCur'} growthKey={priceKpiMode === 'preco' ? 'precoMedioGrowth' : 'ticketMedioGrowth'} icon={priceKpiMode === 'preco' ? "Package" : "MapPin"} color="blue" onClick={priceKpiMode === 'preco' ? () => openModal('preco') : null} toggle={() => setPriceKpiMode(p => p === 'preco' ? 'ticket' : 'preco')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isCurrency={true} />
+                            <KPICard title="Capilaridade" metricKey="capCur" growthKey="capGrowth" icon="Users" color="indigo" onClick={() => openModal('capilaridade')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+                            <KPICard title="Clientes Novos" metricKey="novosMain" growthKey="fatNovosMain" icon="UserPlus" color="emerald" onClick={() => openModal('novos')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+                            <KPICard title="Em Alerta" metricKey="alertaMain" icon="Bell" color="amber" onClick={() => openModal('alerta')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+                            <KPICard title="Clientes Perdidos" metricKey="perdidosMain" growthKey="fatPerdidosMain" icon="UserMinus" color="rose" onClick={() => openModal('perdidos')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+                        </div>
+
+                        {/* Gráficos Estratégicos Centrais Lado a Lado */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-1.5">
+                            <div className="lg:col-span-2 bg-white p-3 rounded-xl border border-slate-200 shadow-md">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5"><Icon name="TrendingUp" size={12} className="text-blue-600" /> Evolução Mensal</h3>
+                                    <div className="flex bg-slate-100 p-0.5 rounded-lg shadow-sm border border-slate-200 no-export">
+                                        <button onClick={() => setEvolucaoMode('faturamento')} className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-colors ${evolucaoMode === 'faturamento' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>R$ Faturamento</button>
+                                        <button onClick={() => setEvolucaoMode('quantidade')} className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-colors ${evolucaoMode === 'quantidade' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Unidades</button>
+                                    </div>
+                                </div>
+                                <div className="h-[220px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={evolutionChartData.data} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 600, fill: '#94a3b8'}} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => evolucaoMode === 'faturamento' ? `${(Number(v)/1000000).toFixed(1)}M` : (v>=1000 ? (v/1000).toFixed(1)+'k' : v)} />
+                                            <Tooltip formatter={(v, name) => [evolucaoMode === 'faturamento' ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), "Ano " + String(name)]} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 8px 20px rgba(0,0,0,0.1)'}} />
+                                            <Legend verticalAlign="top" height={20} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b' }} />
+                                            {evolutionChartMedia !== null && <ReferenceLine y={evolutionChartMedia} stroke="#94a3b8" strokeDasharray="4 4" label={{ position: 'top', value: `Média: ${evolucaoMode === 'faturamento' ? formatCurrency(evolutionChartMedia) : (evolutionChartMedia>=1000 ? (evolutionChartMedia/1000).toFixed(1)+'k' : Number(evolutionChartMedia).toFixed(0))}`, fill: '#64748b', fontSize: 8, fontWeight: 'bold' }} />}
+                                            {evolutionChartData.lines.map((y, i) => {
+                                                const isNewest = y === Math.max(...evolutionChartData.lines);
+                                                const color = evolutionChartData.lines.length === 2 ? (isNewest ? '#3b82f6' : '#cbd5e1') : CHART_COLORS[i % CHART_COLORS.length];
+                                                return <Line key={String(y)} type="monotone" dataKey={y} name={String(y)} stroke={color} strokeWidth={2.5} dot={{r: 2.5, strokeWidth: 1.5}} activeDot={{r: 4}} connectNulls={false} />
+                                            })}
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-md flex flex-col group">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5"><Icon name="MapPin" size={12} className="text-blue-600" /> Repres. ({timeMode})</h3>
+                                    <div className="flex items-center gap-1.5 no-export">
+                                        <div className="flex flex-wrap gap-0.5 bg-slate-100 p-0.5 rounded-md shadow-sm border border-slate-200">
+                                            {['UF', 'Distribuidor', 'Tipo Cliente', 'Unidade'].map(m => (
+                                                <button key={m} onClick={() => setPieChartMetric(m)} className={`px-1.5 py-0.5 text-[7px] font-bold rounded transition-all ${pieChartMetric === m ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                                    {m}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <button onClick={() => openModal('representatividade')} className="text-[8px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100 shadow-sm border border-blue-200 flex items-center gap-1" title="Ver Oportunidades (White Space)">
+                                            <Icon name="Target" size={10} /> 
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="h-[220px] w-full flex-1 relative">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <Treemap data={pieChartDataMain} dataKey="value" stroke="#fff" content={(props) => <CustomTreemapContentRecharts {...props} />}>
+                                            <Tooltip content={(props) => <CustomUFTooltip {...props} />} />
+                                        </Treemap>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-1.5">
+                            <RankWidget title="Top Produtos" icon="Package" colorClass="text-blue-600" fillHex="#3b82f6" data={topProductsGlobal} isFat={false} onOpenModal={() => openModal('produtos')} timeMode={timeMode} yearComparison={yearComparisonData} />
+                            <RankWidget title="Top Distribuidores" icon="Truck" colorClass="text-emerald-500" fillHex="#10b981" data={topDistribuidoresGlobal} isFat={true} onOpenModal={() => openModal('distribuidores')} timeMode={timeMode} yearComparison={yearComparisonData} />
+                            <RankWidget title="Top Clientes" icon="Users" colorClass="text-fuchsia-500" fillHex="#f59e0b" data={topClientsGlobal} isFat={true} onOpenModal={() => openModal('top')} timeMode={timeMode} yearComparison={yearComparisonData} />
+                        </div>
+                        
+                        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-md mb-1.5">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5 cursor-help border-b border-dashed border-slate-400 w-fit pb-[1px]" title="Eixo X = Crescimento (%) | Eixo Y = Faturamento (R$).">
+                                    <Icon name="Target" size={12} className="text-blue-600" /> Matriz de Performance
+                                </h3>
+                                <div className="flex items-center gap-1.5 no-export">
+                                    <div className="flex bg-slate-100 p-0.5 rounded-md shadow-sm border border-slate-200">
+                                        <button onClick={() => setScatterMetric('clientes')} className={`px-2 py-0.5 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'clientes' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Clientes</button>
+                                        <button onClick={() => setScatterMetric('produtos')} className={`px-2 py-0.5 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'produtos' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Produtos</button>
+                                        <button onClick={() => setScatterMetric('distribuidores')} className={`px-2 py-0.5 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'distribuidores' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Distrib.</button>
+                                    </div>
+                                    <button onClick={() => setMatrixShowInactive(!matrixShowInactive)} className={`text-[8px] font-bold px-2 py-1 rounded-md shadow-sm border transition-colors flex items-center gap-1 ${matrixShowInactive ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`} title="Mostrar ou ocultar itens que pararam de comprar (Churn)">
+                                        <Icon name={matrixShowInactive ? "UserMinus" : "Users"} size={10} /> {matrixShowInactive ? 'Ocultar Inativos' : '+ Inativos'}
+                                    </button>
+                                    <button onClick={() => openModal('matriz')} className="text-[8px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100 shadow-sm border border-blue-200 flex items-center gap-1">
+                                        <Icon name="List" size={10} /> Raio-X
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 mb-2 justify-center flex-wrap no-export">
+                                <div className="flex items-center gap-1 text-[8px] font-bold text-emerald-600 cursor-help" title="Alta Receita e Alto Crescimento. Os motores do negócio."><div className="w-2 h-2 rounded-sm bg-emerald-500"></div> Estrelas</div>
+                                <div className="flex items-center gap-1 text-[8px] font-bold text-blue-600 cursor-help" title="Alta Receita, mas Baixo Crescimento (ou queda). Exigem proteção e atenção."><div className="w-2 h-2 rounded-sm bg-blue-500"></div> Vacas Leiteiras</div>
+                                <div className="flex items-center gap-1 text-[8px] font-bold text-amber-600 cursor-help" title="Baixa Receita, mas Alto Crescimento. Os talentos do futuro."><div className="w-2 h-2 rounded-sm bg-amber-500"></div> Apostas</div>
+                                <div className="flex items-center gap-1 text-[8px] font-bold text-rose-600 cursor-help" title="Baixa Receita e Baixo Crescimento. Avaliar esforço de manutenção."><div className="w-2 h-2 rounded-sm bg-rose-500"></div> Abacaxis</div>
+                            </div>
+
+                            <div className="h-[220px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ScatterChart margin={{ top: 5, right: 20, bottom: 0, left: -10 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis type="number" dataKey="growth" name="Crescimento" unit="%" tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => `${v}%`} axisLine={false} tickLine={false} />
+                                        <YAxis type="number" dataKey="fatCur" name="Faturamento" tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => `${(v/1000000).toFixed(1)}M`} axisLine={false} tickLine={false} width={35} />
+                                        <ZAxis type="number" dataKey="fatCur" range={[30, 180]} />
+                                        <Tooltip cursor={{strokeDasharray: '3 3'}} content={(props) => <CustomScatterTooltip {...props} />} />
+                                        <ReferenceLine y={scatterPlotData.avgFat} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideTopLeft', value: 'Média Fat.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
+                                        <ReferenceLine x={scatterPlotData.thresholdG} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideBottomRight', value: scatterPlotData.avgGrowth < 0 ? 'Mín (0%)' : 'Média Cresc.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
+                                        <Scatter name="Performance" data={scatterPlotData.filtered} fillOpacity={0.8}>
+                                            {scatterPlotData.filtered.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fillHex} />)}
+                                        </Scatter>
+                                    </ScatterChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div className="text-center mt-1 pb-4 border-t border-slate-200 pt-4 no-export">
+                            <p className="text-[9px] text-slate-400 font-semibold tracking-wider">
+                                DESENVOLVIDO POR: <a href="mailto:george.gos@gmail.com" className="text-blue-500 hover:text-blue-700 font-black hover:underline transition-colors ml-1">GEORGE SILVA</a>
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Modais Analíticos em Tela Cheia */}
+                    {modalConfig.isOpen && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 md:p-6 print:static print:bg-transparent print:backdrop-blur-none print:p-0">
+                            <div className="bg-white rounded-2xl md:rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in print-modal-wrapper print:shadow-none print:border-none print:rounded-none print:max-h-none">
+                                <div className="p-4 lg:p-5 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50 gap-4 shrink-0 md:rounded-t-3xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${['novos','distribuidores'].includes(modalConfig.type)?'text-emerald-600 bg-emerald-100':['perdidos'].includes(modalConfig.type)?'text-rose-600 bg-rose-100':['top'].includes(modalConfig.type)?'text-fuchsia-600 bg-fuchsia-100':['alerta'].includes(modalConfig.type)?'text-amber-600 bg-amber-100':['preco','produtos','matriz','representatividade'].includes(modalConfig.type)?'text-blue-600 bg-blue-100':['abc'].includes(modalConfig.type)?'text-indigo-600 bg-indigo-100':'text-slate-600 bg-slate-100'}`}>
+                                            <Icon name={IconName} size={20}/>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter">{modalTitle}</h2>
+                                            <p className="text-[10px] font-bold text-slate-500">{modalDesc}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 no-export flex-wrap">
+                                        {['distribuidores','produtos','top','abc'].includes(modalConfig.type) ? (
+                                            <div className="min-w-[200px]">
+                                                <CustomSelect label={ modalConfig.type==='distribuidores'?'Distribuidor':modalConfig.type==='produtos'?'Produto':modalConfig.type==='abc'?(abcDimension==='clientes'?'Cliente':'Produto'):'Cliente' } options={ modalConfig.type==='distribuidores'?availableModalDistribuidores:modalConfig.type==='produtos'?availableModalProdutos:modalConfig.type==='abc'?abcOptions:availableModalClientes } selected={ modalConfig.type==='distribuidores'?modalDistributorFilter:modalConfig.type==='produtos'?modalProductFilter:modalConfig.type==='abc'?modalAbcFilter:modalClientFilter } onChange={v=>{ if(modalConfig.type==='distribuidores')setModalDistributorFilter(v); else if(modalConfig.type==='produtos')setModalProductFilter(v); else if(modalConfig.type==='top')setModalClientFilter(v); else if(modalConfig.type==='abc')setModalAbcFilter(v); }} placeholder="Pesquisar..." searchable={true} />
+                                            </div>
+                                        ) : modalConfig.type === 'representatividade' ? (
+                                            <div className="min-w-[200px]">
+                                                <CustomSelect label={`Selecionar ${pieChartMetric}`} options={representatividadeDetails?.options || []} selected={modalRepFilter} onChange={(v)=>{setModalRepFilter(v); setSelectedOpportunity(null);}} placeholder="Pesquisar..." searchable={true} />
+                                            </div>
+                                        ) : null}
+                                        
+                                        {getModalBadge() && <div className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold">{String(getModalBadge())}</div>}
+
+                                        <button onClick={exportToPDF} className="px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-[10px] font-black border border-rose-100 flex items-center gap-1.5 hover:bg-rose-100 shadow-sm"><Icon name="Download" size={12}/> PDF</button>
+                                        
+                                        {modalConfig.type !== 'manual' && (
+                                            <button onClick={handleExportModalExcelData} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black border border-emerald-100 flex items-center gap-1.5 hover:bg-emerald-100 shadow-sm"><Icon name="FileSpreadsheet" size={12}/> Excel</button>
+                                        )}
+
+                                        <button onClick={()=>setModalConfig({isOpen:false, type:null})} className="w-9 h-9 bg-white border border-slate-200 rounded-xl flex items-center justify-center hover:text-rose-500 transition-all shadow-sm"><Icon name="X" size={16}/></button>
+                                    </div>
+                                </div>
+
+                                {!['abc','manual','matriz','representatividade'].includes(modalConfig.type) && (
+                                    <div className="p-3 bg-white border-b border-slate-50 flex gap-2 no-export items-end">
+                                        {['capilaridade','preco','analitico'].includes(modalConfig.type) && (
+                                            <div className="flex flex-col gap-0.5 min-w-[100px]">
+                                                <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Ano</label>
+                                                <div className="relative">
+                                                    <select value={modalYearFilter} onChange={e=>setModalYearFilter(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 shadow-sm appearance-none h-[28px]">
+                                                        <option value="Todos">Todos</option>
+                                                        {allAvailableYears.map(y=><option key={String(y)} value={String(y)}>{y}</option>)}
+                                                    </select>
+                                                    <Icon name="ChevronDown" size={10} className="absolute right-2 top-2 text-slate-400 pointer-events-none"/>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="flex-1 max-w-xs">
+                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Busca Livre</label>
+                                            <DebouncedInput value={localModalSearch} onChange={setLocalModalSearch} placeholder="Filtrar nesta lista..." icon="Search"/>
+                                        </div>
+                                        <CustomMultiSelect label="Filtrar UF" options={availableOptions.states} selected={modalUfFilter} onChange={setModalUfFilter} placeholder="Todas UFs" searchable={true} />
+                                    </div>
+                                )}
+                                
+                                {modalConfig.type === 'representatividade' && (
+                                    <div className="p-3 bg-white border-b border-slate-50 flex gap-2 no-export items-end">
+                                        <div className="flex-1 max-w-xs">
+                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Busca Livre</label>
+                                            <DebouncedInput value={localModalSearch} onChange={setLocalModalSearch} placeholder="Filtrar clientes..." icon="Search"/>
+                                        </div>
+                                        <CustomMultiSelect label="Filtrar UF" options={availableOptions.states} selected={modalUfFilter} onChange={setModalUfFilter} placeholder="Todas UFs" searchable={true} />
+                                    </div>
+                                )}
+
+                                {(localModalSearch || modalUfFilter.length > 0) && !['abc','manual'].includes(modalConfig.type) && (
+                                    <div className="flex items-center gap-2 px-4 py-2 w-full border-b border-slate-100 bg-slate-50/50 no-export">
+                                        <span className="text-[8px] font-black text-slate-400 flex items-center gap-1"><Icon name="Filter" size={10} /> FILTROS ATIVOS:</span>
+                                        {localModalSearch && <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded text-[8px] font-bold shadow-sm">BUSCA: "{localModalSearch}"</span>}
+                                        {modalUfFilter.length > 0 && <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded text-[8px] font-bold shadow-sm">UF: {modalUfFilter.join(', ')}</span>}
+                                    </div>
+                                )}
+
+                                <div className="p-0 overflow-y-auto modal-scroll flex-1 bg-slate-50/50 print-modal-bg print:overflow-visible print:bg-white">
                                     {renderModalBody()}
                                 </div>
                             </div>
                         </div>
                     )}
-
-                    {/* Cabeçalho Principal do Dashboard */}
-                    <div className="bg-white p-2 lg:p-3 rounded-xl border border-slate-200 shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-1.5">
-                        <div className="flex items-center gap-3">
-                            <div className="relative w-10 h-10 shrink-0">
-                                <img 
-                                    src="youyou.webp" 
-                                    alt="Mascote YouYou" 
-                                    className="absolute inset-0 w-10 h-10 object-contain drop-shadow-md bg-white rounded-full border border-slate-200 p-0.5 z-10" 
-                                    onError={(e) => { 
-                                        e.target.onerror = null; 
-                                        e.target.style.display = 'none'; 
-                                    }} 
-                                />
-                                <div className="absolute inset-0 w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center border border-indigo-200 shadow-inner z-0">
-                                    <Icon name="TrendingUp" size={18} className="text-indigo-600"/>
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <div className="w-1 h-4 bg-blue-600 rounded-full shadow-sm"></div>
-                                    <h1 className="text-base font-black tracking-tight text-slate-800 uppercase leading-none whitespace-nowrap">Performance Comercial</h1>
-                                </div>
-                                <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest ml-2.5">Dashboard Sellout {currentUser && <span className="text-blue-500 font-black normal-case tracking-normal ml-1">&bull; {String(currentUser.nome.split(' ')[0])}</span>}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-inner">
-                            <button onClick={()=>setTimeMode('U6M')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded-md transition-all ${timeMode==='U6M'?'bg-white shadow text-blue-700':'text-slate-500 hover:text-slate-700'}`}>U6M</button>
-                            <button onClick={()=>setTimeMode('UDM')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded-md transition-all ${timeMode==='UDM'?'bg-white shadow text-blue-700':'text-slate-500 hover:text-slate-700'}`}>UDM</button>
-                            <button onClick={()=>setTimeMode('YTD')} className={`px-2.5 py-1 text-[8px] uppercase tracking-wider font-black rounded-md transition-all ${timeMode==='YTD'?'bg-white shadow text-blue-700':'text-slate-500 hover:text-slate-700'}`}>YTD</button>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                            {lastUpdate && <div className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 shadow-sm px-2 py-1 rounded-lg flex items-center gap-1"><Icon name="Clock" size={10} className="text-slate-400" /> Atualizado: <span className="text-slate-700">{String(lastUpdate)}</span></div>}
-                            <button onClick={()=>openModal('manual')} className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-blue-100 shadow-sm"><Icon name="BookOpen" size={10}/> Manual</button>
-                            <button onClick={exportToPDF} className="flex items-center gap-1 bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-black shadow-sm"><Icon name="Download" size={10}/> PDF</button>
-                            <button onClick={handleExportMainExcel} className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-emerald-100 shadow-sm"><Icon name="FileSpreadsheet" size={10}/> Excel</button>
-                            <button onClick={()=>openModal('abc')} className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-indigo-100 shadow-sm"><Icon name="Target" size={10}/> Curva ABC</button>
-                            <button onClick={()=>openModal('analitico')} className="flex items-center gap-1 bg-white text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-slate-50 shadow-sm"><Icon name="List" size={10}/> Analítico</button>
-                            <button onClick={()=>{setShowUploadScreen(true);setIsLoaded(false);}} className="flex items-center gap-1 bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-black shadow-sm"><Icon name="Upload" size={10}/> CSV</button>
-                            <button onClick={()=>{setShowUploadScreen(true);setIsLoaded(false);setCurrentUser(null);setPasswordValue('');setIsAdminVerified(false);}} className="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-rose-100 shadow-sm"><Icon name="UserMinus" size={10}/> Sair</button>
-                        </div>
-                    </div>
-
-                    {/* Filtros */}
-                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-md flex flex-wrap gap-2 items-end mb-1.5">
-                        <div className="flex-[1.5] min-w-[120px]"><DebouncedInput value={filters.searchCustomer} onChange={v => setFilters({...filters, searchCustomer: v})} placeholder="Nome/CNPJ..." icon="Search" /></div>
-                        <div className="flex-[1.5] min-w-[120px]"><DebouncedInput value={filters.searchProduct} onChange={v => setFilters({...filters, searchProduct: v})} placeholder="Produto..." icon="Package" /></div>
-                        <CustomMultiSelect label="Anos" options={availableOptions.years} selected={filters.years} onChange={v => setFilters({...filters, years: v})} placeholder="Todos" searchable={true} />
-                        <CustomMultiSelect label="Meses" options={availableOptions.months} selected={filters.months} onChange={v => setFilters({...filters, months: v})} placeholder="Todos" searchable={true} />
-                        <CustomMultiSelect label="Estado" options={availableOptions.states} selected={filters.state} onChange={v => setFilters({...filters, state: v})} placeholder="Todos" searchable={true} />
-                        <CustomMultiSelect label="Cidade" options={availableOptions.cities} selected={filters.city} onChange={v => setFilters({...filters, city: v})} placeholder="Todas" searchable={true} />
-                        <CustomMultiSelect label="Distribuidor" options={availableOptions.distributors} selected={filters.distributor} onChange={v => setFilters({...filters, distributor: v})} placeholder="Todos" searchable={true} />
-                        <CustomMultiSelect label="Tipo Cliente" options={availableOptions.customerTypes} selected={filters.customerType} onChange={v => setFilters({...filters, customerType: v})} placeholder="Todos" searchable={true} />
-                        <CustomMultiSelect label="Unidade" options={availableOptions.types} selected={filters.type} onChange={v => setFilters({...filters, type: v})} placeholder="Todas" searchable={true} />
-                        
-                        <div className="flex flex-col justify-end pb-0.5">
-                            <button onClick={() => initialFilters && setFilters(initialFilters)} className="px-3 h-[24px] bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 text-[8px] font-bold rounded border border-slate-200 transition-colors flex items-center gap-1 shadow-sm" title="Limpar todos os filtros">
-                                <Icon name="X" size={10} /> Limpar
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* KPIs */}
-                    <div className="grid grid-cols-3 xl:grid-cols-6 gap-2 mb-1.5">
-                        <KPICard title="Faturamento" metricKey="fatCur" growthKey="fatGrowth" icon="TrendingUp" color="slate" met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isCurrency={true} />
-                        <KPICard title={priceKpiMode === 'preco' ? 'Preço Médio' : 'Ticket Médio'} metricKey={priceKpiMode === 'preco' ? 'precoMedioCur' : 'ticketMedioCur'} growthKey={priceKpiMode === 'preco' ? 'precoMedioGrowth' : 'ticketMedioGrowth'} icon={priceKpiMode === 'preco' ? "Package" : "MapPin"} color="blue" onClick={priceKpiMode === 'preco' ? () => openModal('preco') : null} toggle={() => setPriceKpiMode(p => p === 'preco' ? 'ticket' : 'preco')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isCurrency={true} />
-                        <KPICard title="Capilaridade" metricKey="capCur" growthKey="capGrowth" icon="Users" color="indigo" onClick={() => openModal('capilaridade')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
-                        <KPICard title="Clientes Novos" metricKey="novosMain" growthKey="fatNovosMain" icon="UserPlus" color="emerald" onClick={() => openModal('novos')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
-                        <KPICard title="Em Alerta" metricKey="alertaMain" icon="Bell" color="amber" onClick={() => openModal('alerta')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
-                        <KPICard title="Clientes Perdidos" metricKey="perdidosMain" growthKey="fatPerdidosMain" icon="UserMinus" color="rose" onClick={() => openModal('perdidos')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
-                    </div>
-
-                    {/* Gráficos Estratégicos Centrais Lado a Lado */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-1.5">
-                        <div className="lg:col-span-2 bg-white p-3 rounded-xl border border-slate-200 shadow-md">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5"><Icon name="TrendingUp" size={12} className="text-blue-600" /> Evolução Mensal</h3>
-                                <div className="flex bg-slate-100 p-0.5 rounded-lg shadow-sm border border-slate-200">
-                                    <button onClick={() => setEvolucaoMode('faturamento')} className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-colors ${evolucaoMode === 'faturamento' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>R$ Faturamento</button>
-                                    <button onClick={() => setEvolucaoMode('quantidade')} className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-colors ${evolucaoMode === 'quantidade' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Unidades</button>
-                                </div>
-                            </div>
-                            <div className="h-[220px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={evolutionChartData.data} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 600, fill: '#94a3b8'}} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => evolucaoMode === 'faturamento' ? `${(Number(v)/1000000).toFixed(1)}M` : (v>=1000 ? (v/1000).toFixed(1)+'k' : v)} />
-                                        <Tooltip formatter={(v, name) => [evolucaoMode === 'faturamento' ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), "Ano " + String(name)]} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 8px 20px rgba(0,0,0,0.1)'}} />
-                                        <Legend verticalAlign="top" height={20} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b' }} />
-                                        {evolutionChartMedia !== null && <ReferenceLine y={evolutionChartMedia} stroke="#94a3b8" strokeDasharray="4 4" label={{ position: 'top', value: `Média: ${evolucaoMode === 'faturamento' ? formatCurrency(evolutionChartMedia) : (evolutionChartMedia>=1000 ? (evolutionChartMedia/1000).toFixed(1)+'k' : Number(evolutionChartMedia).toFixed(0))}`, fill: '#64748b', fontSize: 8, fontWeight: 'bold' }} />}
-                                        {evolutionChartData.lines.map((y, i) => {
-                                            const isNewest = y === Math.max(...evolutionChartData.lines);
-                                            const color = evolutionChartData.lines.length === 2 ? (isNewest ? '#3b82f6' : '#cbd5e1') : CHART_COLORS[i % CHART_COLORS.length];
-                                            return <Line key={String(y)} type="monotone" dataKey={y} name={String(y)} stroke={color} strokeWidth={2.5} dot={{r: 2.5, strokeWidth: 1.5}} activeDot={{r: 4}} connectNulls={false} />
-                                        })}
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-md flex flex-col group">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5"><Icon name="MapPin" size={12} className="text-blue-600" /> Repres. ({timeMode})</h3>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="flex flex-wrap gap-0.5 bg-slate-100 p-0.5 rounded-md shadow-sm border border-slate-200">
-                                        {['UF', 'Distribuidor', 'Tipo Cliente', 'Unidade'].map(m => (
-                                            <button key={m} onClick={() => setPieChartMetric(m)} className={`px-1.5 py-0.5 text-[7px] font-bold rounded transition-all ${pieChartMetric === m ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-                                                {m}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <button onClick={() => openModal('representatividade')} className="text-[8px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100 shadow-sm border border-blue-200 flex items-center gap-1">
-                                        <Icon name="List" size={10} /> Raio-X
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="h-[220px] w-full flex-1 relative">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <Treemap data={pieChartDataMain} dataKey="value" stroke="#fff" content={(props) => <CustomTreemapContentRecharts {...props} />}>
-                                        <Tooltip content={(props) => <CustomUFTooltip {...props} />} />
-                                    </Treemap>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 mb-1.5">
-                        <RankWidget title="Top Produtos" icon="Package" colorClass="text-blue-600" fillHex="#3b82f6" data={topProductsGlobal} isFat={false} onOpenModal={() => openModal('produtos')} timeMode={timeMode} yearComparison={yearComparisonData} />
-                        <RankWidget title="Top Distribuidores" icon="Truck" colorClass="text-emerald-500" fillHex="#10b981" data={topDistribuidoresGlobal} isFat={true} onOpenModal={() => openModal('distribuidores')} timeMode={timeMode} yearComparison={yearComparisonData} />
-                        <RankWidget title="Top Clientes" icon="Users" colorClass="text-fuchsia-500" fillHex="#f59e0b" data={topClientsGlobal} isFat={true} onOpenModal={() => openModal('top')} timeMode={timeMode} yearComparison={yearComparisonData} />
-                    </div>
-                    
-                    <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-md mb-1.5">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5 cursor-help border-b border-dashed border-slate-400 w-fit pb-[1px]" title="Eixo X = Crescimento (%) | Eixo Y = Faturamento (R$).">
-                                <Icon name="Target" size={12} className="text-blue-600" /> Matriz de Performance
-                            </h3>
-                            <div className="flex items-center gap-1.5">
-                                <div className="flex bg-slate-100 p-0.5 rounded-md shadow-sm border border-slate-200">
-                                    <button onClick={() => setScatterMetric('clientes')} className={`px-2 py-0.5 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'clientes' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Clientes</button>
-                                    <button onClick={() => setScatterMetric('produtos')} className={`px-2 py-0.5 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'produtos' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Produtos</button>
-                                    <button onClick={() => setScatterMetric('distribuidores')} className={`px-2 py-0.5 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'distribuidores' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Distrib.</button>
-                                </div>
-                                <button onClick={() => setMatrixShowInactive(!matrixShowInactive)} className={`text-[8px] font-bold px-2 py-1 rounded-md shadow-sm border transition-colors flex items-center gap-1 ${matrixShowInactive ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`} title="Mostrar ou ocultar itens que pararam de comprar (Churn)">
-                                    <Icon name={matrixShowInactive ? "UserMinus" : "Users"} size={10} /> {matrixShowInactive ? 'Ocultar Inativos' : '+ Inativos'}
-                                </button>
-                                <button onClick={() => openModal('matriz')} className="text-[8px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md hover:bg-blue-100 shadow-sm border border-blue-200 flex items-center gap-1">
-                                    <Icon name="List" size={10} /> Raio-X
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-3 mb-2 justify-center flex-wrap no-export">
-                            <div className="flex items-center gap-1 text-[8px] font-bold text-emerald-600 cursor-help" title="Alta Receita e Alto Crescimento. Os motores do negócio."><div className="w-2 h-2 rounded-sm bg-emerald-500"></div> Estrelas</div>
-                            <div className="flex items-center gap-1 text-[8px] font-bold text-blue-600 cursor-help" title="Alta Receita, mas Baixo Crescimento (ou queda). Exigem proteção e atenção."><div className="w-2 h-2 rounded-sm bg-blue-500"></div> Vacas Leiteiras</div>
-                            <div className="flex items-center gap-1 text-[8px] font-bold text-amber-600 cursor-help" title="Baixa Receita, mas Alto Crescimento. Os talentos do futuro."><div className="w-2 h-2 rounded-sm bg-amber-500"></div> Apostas</div>
-                            <div className="flex items-center gap-1 text-[8px] font-bold text-rose-600 cursor-help" title="Baixa Receita e Baixo Crescimento. Avaliar esforço de manutenção."><div className="w-2 h-2 rounded-sm bg-rose-500"></div> Abacaxis</div>
-                        </div>
-
-                        <div className="h-[220px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ScatterChart margin={{ top: 5, right: 20, bottom: 0, left: -10 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis type="number" dataKey="growth" name="Crescimento" unit="%" tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => `${v}%`} axisLine={false} tickLine={false} />
-                                    <YAxis type="number" dataKey="fatCur" name="Faturamento" tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => `${(v/1000000).toFixed(1)}M`} axisLine={false} tickLine={false} width={35} />
-                                    <ZAxis type="number" dataKey="fatCur" range={[30, 180]} />
-                                    <Tooltip cursor={{strokeDasharray: '3 3'}} content={(props) => <CustomScatterTooltip {...props} />} />
-                                    <ReferenceLine y={scatterPlotData.avgFat} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideTopLeft', value: 'Média Fat.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
-                                    <ReferenceLine x={scatterPlotData.thresholdG} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideBottomRight', value: scatterPlotData.avgGrowth < 0 ? 'Mín (0%)' : 'Média Cresc.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
-                                    <Scatter name="Performance" data={scatterPlotData.filtered} fillOpacity={0.8}>
-                                        {scatterPlotData.filtered.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fillHex} />)}
-                                    </Scatter>
-                                </ScatterChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    <div className="text-center mt-1 pb-4 border-t border-slate-200 pt-4 no-export">
-                        <p className="text-[9px] text-slate-400 font-semibold tracking-wider">
-                            DESENVOLVIDO POR: <a href="mailto:george.gos@gmail.com" className="text-blue-500 hover:text-blue-700 font-black hover:underline transition-colors ml-1">GEORGE SILVA</a>
-                        </p>
-                    </div>
                 </div>
             );
         };
