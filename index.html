@@ -11,7 +11,6 @@
     <script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Biblioteca para Exportação Nativa de PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
@@ -27,14 +26,27 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         
-        /* Configuração de Impressão PDF Inteligente via React State */
+        @media print {
+            @page { size: landscape; margin: 10mm; }
+            body { background-color: #ffffff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .no-export { display: none !important; }
+            .shadow-md, .shadow-lg, .shadow-sm, .shadow-xl, .shadow-2xl { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
+            .custom-scroll, .modal-scroll, .overflow-y-auto { overflow: visible !important; max-height: none !important; }
+            .recharts-wrapper { page-break-inside: avoid !important; }
+            div[class*="bg-white"] { page-break-inside: avoid !important; }
+            .print-modal-bg { position: static !important; background: transparent !important; backdrop-filter: none !important; padding: 0 !important; }
+            .print-modal-wrapper { max-height: none !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; }
+        }
+
         .pdf-mode .no-export { display: none !important; }
         .pdf-mode .shadow-md, .pdf-mode .shadow-lg, .pdf-mode .shadow-sm, .pdf-mode .shadow-xl, .pdf-mode .shadow-2xl { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
-        .pdf-mode .custom-scroll, .pdf-mode .modal-scroll, .pdf-mode .overflow-y-auto { overflow: visible !important; max-height: none !important; height: auto !important; }
+        .pdf-mode ::-webkit-scrollbar { display: none !important; }
+        .pdf-mode * { scrollbar-width: none !important; }
         .pdf-mode .recharts-wrapper { page-break-inside: avoid !important; }
         .pdf-mode div[class*="bg-white"] { page-break-inside: avoid !important; }
-        .pdf-mode .fixed.inset-0 { position: static !important; background: transparent !important; backdrop-filter: none !important; padding: 0 !important; }
-        .pdf-mode .print-modal-wrapper { max-height: none !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; width: 100% !important; max-width: none !important; }
+        .pdf-mode.has-modal > div:first-child { display: none !important; }
+        .pdf-mode .modal-overlay-bg { position: relative !important; background: transparent !important; backdrop-filter: none !important; padding: 0 !important; min-height: 100vh !important; align-items: flex-start !important; }
+        .pdf-mode .print-modal-wrapper { max-height: none !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; overflow: hidden !important; }
     </style>
 </head>
 <body>
@@ -44,7 +56,6 @@
         const { useState, useMemo, useEffect, useRef } = React;
         const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Treemap, Legend, ReferenceLine, ScatterChart, Scatter, ZAxis, ComposedChart } = window.Recharts;
 
-        // --- Configurações de Acesso ---
         const USUARIOS = [
             { nome: "George Silva (Admin)", estados: "ALL", role: "admin", hash: "Z3NpbHZhMDAx" },
             { nome: "Diretoria", estados: "ALL", role: "admin", hash: "YWRtaW4uZGly" },
@@ -65,7 +76,7 @@
             Search: `<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
             ChevronDown: `<polyline points="6 9 12 15 18 9"/>`,
             MapPin: `<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>`,
-            Truck: `<rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle>`,
+            Truck: `<rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle>`,
             Users: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`,
             X: `<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`,
             Clock: `<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>`,
@@ -92,7 +103,6 @@
         const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b', '#14b8a6'];
         const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-        // --- Funções Auxiliares ---
         const removeAccents = (str) => str ? String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
         const formatCurrency = (val) => { const n = Number(val) || 0; return n >= 1e6 ? `R$ ${(n/1e6).toFixed(2)}M` : n >= 1e3 ? `R$ ${(n/1e3).toFixed(2)}k` : `R$ ${n.toFixed(2)}`; };
         const formatShortNum = (val) => { const n = Number(val) || 0; return n >= 1e6 ? `${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `${(n/1e3).toFixed(1)}k` : n.toFixed(1); };
@@ -116,7 +126,6 @@
             const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = `${title}.csv`; l.click();
         };
 
-        // --- Componentes UI Reutilizáveis ---
         const DebouncedInput = ({ value, onChange, placeholder, icon }) => {
             const [localVal, setLocalVal] = useState(value || ''); const ref = useRef(onChange);
             useEffect(() => { ref.current = onChange; }, [onChange]);
@@ -194,7 +203,6 @@
             </div>
         );
 
-        // --- Gráficos e Tooltips ---
         const CustomTreemapContentRecharts = (props) => {
             const { x, y, width, height, index, name, value, root } = props;
             if (width < 25 || height < 25) return null; 
@@ -204,14 +212,10 @@
                 <g>
                     <rect x={x} y={y} width={width} height={height} fill={CHART_COLORS[(index||0)%CHART_COLORS.length]} stroke="#fff" strokeWidth={1} rx={3} ry={3} />
                     {width > 45 && height > 35 && sName && (
-                        <text x={x+width/2} y={y+height/2-6} textAnchor="middle" fill="#ffffff" fontSize={11} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">
-                            {sName.length > 14 ? sName.substring(0, 14)+'...' : sName}
-                        </text>
+                        <text x={x+width/2} y={y+height/2-6} textAnchor="middle" fill="#ffffff" fontSize={11} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">{sName.length > 14 ? sName.substring(0, 14)+'...' : sName}</text>
                     )}
                     {width > 45 && height > 35 && (
-                        <text x={x+width/2} y={y+height/2+8} textAnchor="middle" fill="#ffffff" fontSize={10} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">
-                            {formatShortNum(value)} ({pct}%)
-                        </text>
+                        <text x={x+width/2} y={y+height/2+8} textAnchor="middle" fill="#ffffff" fontSize={10} fontWeight="900" dominantBaseline="central" stroke="#000000" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">{formatShortNum(value)} ({pct}%)</text>
                     )}
                 </g>
             );
@@ -276,39 +280,42 @@
             return <text x={(x||0) + (width||0) + 6} y={(y||0) + (height||0)/2 + 1} fill={color} textAnchor="start" dominantBaseline="central" fontSize="9" fontWeight="bold">{isFat ? formatCurrency(value) : (Number(value) || 0).toLocaleString('pt-BR') + " un"}</text>;
         };
 
-        const MiniBarChart = ({ data, color, isFat, title }) => (
+        const MiniBarChart = ({ data, color, isFat, title, isPdfMode }) => (
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-center mb-2"><h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{String(title)}</h4></div>
                 <div className="h-32 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" key={`minibar-${isPdfMode}`}>
                         <BarChart data={data} layout="vertical" margin={{left: -20, right: 40}}>
                             <XAxis type="number" hide />
                             <YAxis dataKey="name" type="category" width={90} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize:9,fontWeight:700,fill:'#64748b'}} interval={0} />
                             <Tooltip formatter={(v) => [isFat ? formatCurrency(v) : (Number(v).toLocaleString('pt-BR') + " un"), isFat ? 'Faturamento' : 'Quantidade']} cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '10px', fontWeight: 'bold'}} />
-                            <Bar dataKey={isFat ? 'valor' : 'qty'} fill={color} radius={[0, 4, 4, 0]} barSize={8} label={renderBarLabel(isFat, color)} />
+                            <Bar dataKey={isFat ? 'valor' : 'qty'} fill={color} radius={[0, 4, 4, 0]} barSize={8} label={renderBarLabel(isFat, color)} isAnimationActive={!isPdfMode} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
         );
 
-        const MiniLineChart = ({ data, isFat, setMode }) => (
+        const MiniLineChart = ({ data, isFat, setMode, isPdfMode, evolutionChartMedia }) => (
             <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-center mb-2">
                     <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Evolução Mensal</h4>
-                    <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 no-export">
                         <button onClick={() => setMode('faturamento')} className={`px-2 py-1 text-[8px] font-bold rounded-md transition-colors ${isFat ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>R$ Fat.</button>
                         <button onClick={() => setMode('quantidade')} className={`px-2 py-1 text-[8px] font-bold rounded-md transition-colors ${!isFat ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Unid.</button>
                     </div>
                 </div>
                 <div className="h-32 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" key={`miniline-${isPdfMode}`}>
                         <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} />
                             <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#94a3b8'}} tickFormatter={v => isFat ? formatShortNum(v) : (v>=1000 ? (Number(v)/1000).toFixed(1)+'k' : v)} width={40} />
-                            <Tooltip formatter={(v, name) => [isFat ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), "Ano " + String(name)]} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '10px', fontWeight: 'bold'}} />
-                            <Line type="monotone" dataKey={isFat ? 'valor' : 'qty'} stroke="#3b82f6" strokeWidth={2} dot={{r: 2, fill: "#3b82f6", strokeWidth: 1.5, stroke: '#fff'}} activeDot={{r: 4}} />
+                            <Tooltip formatter={(v) => [isFat ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), isFat ? 'Faturamento' : 'Quantidade']} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '10px', fontWeight: 'bold'}} />
+                            {evolutionChartMedia !== undefined && evolutionChartMedia !== null && (
+                                <ReferenceLine y={evolutionChartMedia} stroke="#94a3b8" strokeDasharray="4 4" label={{ position: 'top', value: `Média: ${isFat ? formatCurrency(evolutionChartMedia) : formatShortNum(evolutionChartMedia)}`, fill: '#64748b', fontSize: 8, fontWeight: 'bold' }} />
+                            )}
+                            <Line type="monotone" dataKey={isFat ? 'valor' : 'qty'} name={isFat ? 'Faturamento' : 'Quantidade'} stroke="#3b82f6" strokeWidth={2.5} dot={{r: 2.5, strokeWidth: 1.5, fill: '#3b82f6', stroke: '#fff'}} activeDot={{r: 4}} isAnimationActive={!isPdfMode} connectNulls={false} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -327,14 +334,11 @@
                         </div>
                         <div className={`p-1.5 rounded-lg bg-${color}-50 text-${color}-500 border border-${color}-100`}><Icon name={icon} size={14} /></div>
                     </div>
-                    <h3 className={`text-xl font-black text-slate-800 ${isCurrency && value >= 1e6 ? 'tracking-tighter' : ''}`}>
-                        {isCurrency ? formatCurrency(value) : isNumber ? (Number(value)||0).toLocaleString('pt-BR') : value}
-                    </h3>
+                    <h3 className={`text-xl font-black text-slate-800 ${isCurrency && value >= 1e6 ? 'tracking-tighter' : ''}`}>{isCurrency ? formatCurrency(value) : isNumber ? (Number(value)||0).toLocaleString('pt-BR') : value}</h3>
                     <div className="mt-2 h-[18px]">
                         {growth !== null && growth !== undefined ? (
                             <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black border ${growth >= 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`} title={`${yearComp?.curLabel} vs ${yearComp?.prevLabel}`}>
-                                <Icon name={growth >= 0 ? 'TrendingUp' : 'TrendingDown'} size={10} />
-                                {growth >= 0 ? '+' : ''}{Number(growth).toFixed(1)}% <span className="opacity-70 ml-0.5">vs Ant.</span>
+                                <Icon name={growth >= 0 ? 'TrendingUp' : 'TrendingDown'} size={10} /> {growth >= 0 ? '+' : ''}{Number(growth).toFixed(1)}% <span className="opacity-70 ml-0.5">vs Ant.</span>
                             </div>
                         ) : <div className="text-[9px] text-slate-400 font-bold px-1">Sem histórico</div>}
                     </div>
@@ -342,21 +346,21 @@
             );
         };
 
-        const RankWidget = ({ title, icon, colorClass, fillHex, data, isFat, onOpenModal, yearComparison }) => (
+        const RankWidget = ({ title, icon, colorClass, fillHex, data, isFat, onOpenModal, yearComparison, isPdfMode }) => (
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-md flex flex-col group">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Icon name={icon} size={14} className={colorClass} /> {String(title)}</h3>
                     <button onClick={onOpenModal} className={`text-[9px] font-bold ${colorClass} bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center gap-1.5 hover:bg-slate-100 transition-colors shadow-sm no-export`}><Icon name="List" size={10} /> Raio-X</button>
                 </div>
                 <div className="h-48 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" key={`rank-${isPdfMode}`}>
                         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 40, left: -10, bottom: 0 }}>
                             <XAxis type="number" hide={true} />
                             <YAxis dataKey="name" type="category" width={100} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize: 9, fontWeight: 800, fill: '#64748b'}} interval={0} />
                             <Tooltip content={(props) => <CustomYoyTooltip {...props} yearComparison={yearComparison} isProduct={!isFat} />} cursor={{fill: '#f8fafc'}} />
                             <Legend verticalAlign="top" height={20} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b' }} />
-                            <Bar dataKey={isFat?'curVal':'qtyCur'} name="Atual" fill={fillHex} radius={[0, 4, 4, 0]} barSize={6} label={renderBarLabel(isFat, fillHex)} />
-                            <Bar dataKey={isFat?'compVal':'qtyComp'} name="Anterior" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={6} />
+                            <Bar dataKey={isFat?'curVal':'qtyCur'} name="Atual" fill={fillHex} radius={[0, 4, 4, 0]} barSize={6} label={renderBarLabel(isFat, fillHex)} isAnimationActive={!isPdfMode} />
+                            <Bar dataKey={isFat?'compVal':'qtyComp'} name="Anterior" fill="#cbd5e1" radius={[0, 4, 4, 0]} barSize={6} isAnimationActive={!isPdfMode} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -404,104 +408,123 @@
             const handleFileUpload = (e) => {
                 const file = e.target.files[0]; if (!file) return;
                 setIsLoadingAuto(true); setErrorMsg(null); setShowUploadScreen(false);
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    setTimeout(() => {
-                        try {
-                            const text = ev.target.result;
-                            if (!text || text.trim().length === 0) throw new Error("CSV vazio.");
-                            const firstLine = text.split(/\r?\n/)[0] || '';
-                            const delim = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
 
-                            Papa.parse(text, {
-                                header: true, delimiter: delim, skipEmptyLines: 'greedy',
-                                complete: (results) => {
-                                    try {
-                                        const raw = results.data;
-                                        if (!raw || raw.length === 0) throw new Error("Ficheiro sem linhas válidas.");
-                                        const originalHeaders = results.meta.fields || [];
-                                        const cleanHeaders = originalHeaders.map(h => removeAccents(String(h || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, ''));
-                                        const aliases = {
-                                            a: ['amount', 'faturamento', 'total', 'valor', 'venda', 'vendas', 'receita', 'fat', 'vlr', 'bruto', 'liquido', 'valortotal', 'receitabruta', 'vlrliquido'],
-                                            q: ['qty', 'quantidade', 'volume', 'qtd', 'qtde', 'pecas', 'unid', 'unidades', 'peso', 'qnt', 'qntd', 'quant'],
-                                            ct: ['tipocliente', 'canal', 'segmento', 'tipodecliente', 'customertype', 'ramo', 'classificacao', 'grupoparceiro'],
-                                            c: ['cliente', 'nomefantasia', 'razaosocial', 'parceiro', 'customer', 'pdv', 'loja', 'nome', 'comprador', 'destinatario'],
-                                            d: ['distribuidor', 'revenda', 'distributor', 'fornecedor', 'rede', 'representante', 'vendedor', 'equipe'],
-                                            p: ['produto', 'material', 'descricao', 'product', 'item', 'standard', 'desc', 'sku', 'codigo', 'codigoproduto', 'nomeproduto'],
-                                            s: ['uf', 'estado', 'state', 'ufcliente', 'regiao'],
-                                            ci: ['cidade', 'municipio', 'city', 'local', 'cidadecliente'],
-                                            t: ['unidade', 'filial', 'type', 'empresa'],
-                                            y: ['ano', 'year', 'exercicio'],
-                                            m: ['mes', 'month', 'periodo'],
-                                            dt: ['data', 'emissao', 'date', 'dtemissao', 'criacao', 'lancamento', 'movimento', 'documento', 'dataemissao', 'datavenda', 'mesano'],
-                                            cj: ['cnpj', 'cgc', 'documento', 'cpf', 'doc', 'id', 'cgccpf']
-                                        };
-                                        const findKey = (aliasArr) => {
-                                            let idx = cleanHeaders.findIndex(k => aliasArr.includes(k));
-                                            if (idx !== -1) return originalHeaders[idx];
-                                            idx = cleanHeaders.findIndex(k => aliasArr.some(alias => k === alias || k.includes(alias)));
-                                            return idx !== -1 ? originalHeaders[idx] : null;
-                                        };
-                                        const keys = { a: findKey(aliases.a), q: findKey(aliases.q), ct: findKey(aliases.ct), c: findKey(aliases.c), d: findKey(aliases.d), p: findKey(aliases.p), s: findKey(aliases.s), ci: findKey(aliases.ci), t: findKey(aliases.t), y: findKey(aliases.y), m: findKey(aliases.m), dt: findKey(aliases.dt), cj: findKey(aliases.cj) };
-                                        if (!keys.a && !keys.q) throw new Error("Colunas numéricas não encontradas.");
-                                        let maxDateTs = 0; const resData = []; let missingDateRows = 0; let maxFoundYear = 0;
-                                        
-                                        const parseNum = v => { 
-                                            if (!v) return 0; if (typeof v === 'number') return v;
-                                            let str = String(v).trim().replace(/[^\d.,-]/g, '');
-                                            if (!str || str === '-') return 0;
-                                            const lC = str.lastIndexOf(','); const lP = str.lastIndexOf('.');
-                                            if (lC !== -1 && lP !== -1) { if (lC > lP) { str = str.replace(/\./g, '').replace(',', '.'); } else { str = str.replace(/,/g, ''); } } 
-                                            else if (lC !== -1) { if ((str.match(/,/g) || []).length > 1) { str = str.replace(/,/g, ''); } else { str = str.replace(',', '.'); } }
-                                            return parseFloat(str) || 0;
-                                        };
+                setTimeout(() => {
+                    let keys = null;
+                    let maxDateTs = 0; 
+                    const resData = []; 
+                    let missingDateRows = 0; 
+                    let maxFoundYear = 0;
+                    
+                    const parseNum = v => { 
+                        if (!v) return 0; if (typeof v === 'number') return v;
+                        let str = String(v).trim().replace(/[^\d.,-]/g, '');
+                        if (!str || str === '-') return 0;
+                        const lC = str.lastIndexOf(','); const lP = str.lastIndexOf('.');
+                        if (lC !== -1 && lP !== -1) { if (lC > lP) { str = str.replace(/\./g, '').replace(',', '.'); } else { str = str.replace(/,/g, ''); } } 
+                        else if (lC !== -1) { if ((str.match(/,/g) || []).length > 1) { str = str.replace(/,/g, ''); } else { str = str.replace(',', '.'); } }
+                        return parseFloat(str) || 0;
+                    };
 
-                                        for (let i = 0; i < raw.length; i++) {
-                                            const r = raw[i]; const o = {};
-                                            o._amount = keys.a ? parseNum(r[keys.a]) : 0; o._qty = keys.q ? parseNum(r[keys.q]) : 0;
-                                            if (o._amount === 0 && o._qty === 0) continue;
-                                            o._customerType = keys.ct && r[keys.ct] ? String(r[keys.ct]).trim() : 'N/I';
-                                            o._customer = keys.c && r[keys.c] ? String(r[keys.c]).trim() : 'Não Informado';
-                                            o._distributor = keys.d && r[keys.d] ? String(r[keys.d]).trim() : 'Não Informado';
-                                            o._product = keys.p && r[keys.p] ? String(r[keys.p]).trim() : 'Não Informado';
-                                            o._state = keys.s && r[keys.s] ? String(r[keys.s]).trim().toUpperCase() : 'N/I';
-                                            o._city = keys.ci && r[keys.ci] ? String(r[keys.ci]).trim().toUpperCase() : 'N/I';
-                                            o._type = keys.t && r[keys.t] ? String(r[keys.t]).trim() : 'N/I';
-                                            o.cnpj = keys.cj && r[keys.cj] ? String(r[keys.cj]).replace(/\D/g, '') : '';
-                                            let y = keys.y && r[keys.y] ? parseInt(String(r[keys.y]).replace(/\D/g, ''), 10) : 0; 
-                                            let m = keys.m && r[keys.m] ? parseInt(String(r[keys.m]).replace(/\D/g, ''), 10) : 0; 
-                                            let dDay = 1; let rDate = keys.dt && r[keys.dt] ? String(r[keys.dt]).trim().split(' ')[0] : ''; let ts = 0; let dDate = '';
-                                            if (rDate) {
-                                                if (rDate.includes('/')) { const parts = rDate.split('/'); dDay = parseInt(parts[0], 10) || 1; m = m || parseInt(parts[1], 10); y = y || parseInt(parts[parts.length > 2 ? 2 : 0], 10); } 
-                                                else if (rDate.includes('-')) { const parts = rDate.split('-'); if (parts[0].length === 4) { y = parseInt(parts[0], 10) || 0; m = parseInt(parts[1], 10) || 0; dDay = parseInt(parts[2], 10) || 1; } else { dDay = parseInt(parts[0], 10) || 1; m = parseInt(parts[1], 10) || 0; y = parseInt(parts[2], 10) || 0; } } 
-                                                else if (rDate.length === 8 && !isNaN(rDate)) { y = y || parseInt(rDate.substring(0,4), 10); m = m || parseInt(rDate.substring(4,6), 10); dDay = parseInt(rDate.substring(6,8), 10) || 1; }
-                                            }
-                                            if (y > 0 && y < 100) y += 2000;
-                                            if (y > 0 && m > 0) { ts = new Date(y, m - 1, dDay, 12, 0, 0).getTime(); dDate = `${String(dDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${String(y)}`; } 
-                                            else { const now = new Date(); y = now.getFullYear(); m = now.getMonth() + 1; dDay = now.getDate(); ts = new Date(y, m - 1, dDay, 12, 0, 0).getTime(); dDate = `${String(dDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${String(y)}`; missingDateRows++; }
-                                            o._year = y || 0; o._month = m || 0; o._timestamp = ts; o._displayDate = dDate || 'N/I';
-                                            o._customerNorm = removeAccents(o._customer).toLowerCase(); o._productNorm = removeAccents(o._product).toLowerCase(); o._cityNorm = removeAccents(o._city).toLowerCase();
-                                            if (currentUser && currentUser.role !== 'admin' && !currentUser.estados.includes(o._state)) continue;
-                                            if (y > maxFoundYear) maxFoundYear = y;
-                                            resData.push(o); if (ts && ts > maxDateTs) maxDateTs = ts; 
-                                        }
-                                        if (resData.length === 0) throw new Error("Base lida, mas sem dados válidos para a sua região."); 
-                                        
-                                        const wispTypes = [...new Set(resData.map(x => x._customerType))].filter(t => String(t).toUpperCase().includes('WISP'));
-                                        setData(resData); setIsLoaded(true); 
-                                        const initialF = { searchCustomer: '', searchProduct: '', years: maxFoundYear > 0 ? [String(maxFoundYear)] : [], months: [], state: [], city: [], distributor: [], customerType: wispTypes, type: [], product: [] };
-                                        setFilters(initialF); setInitialFilters(initialF);
-                                        let warningTxt = missingDateRows > 0 ? ` | Aviso: ${missingDateRows} vendas sem data` : "";
-                                        if (maxDateTs > 0) { const d = new Date(maxDateTs); setLastUpdate(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}${warningTxt}`); } 
-                                        else { setLastUpdate(`Sincronizado${warningTxt}`); }
-                                    } catch (err) { setErrorMsg(err.message); setShowUploadScreen(true); } finally { setIsLoadingAuto(false); }
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: 'greedy',
+                        chunkSize: 1024 * 1024 * 3,
+                        chunk: (results, parser) => {
+                            if (!keys && results.meta && results.meta.fields) {
+                                const originalHeaders = results.meta.fields || [];
+                                const cleanHeaders = originalHeaders.map(h => removeAccents(String(h || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, ''));
+                                const aliases = {
+                                    a: ['amount', 'faturamento', 'total', 'valor', 'venda', 'vendas', 'receita', 'fat', 'vlr', 'bruto', 'liquido', 'valortotal', 'receitabruta', 'vlrliquido'],
+                                    q: ['qty', 'quantidade', 'volume', 'qtd', 'qtde', 'pecas', 'unid', 'unidades', 'peso', 'qnt', 'qntd', 'quant'],
+                                    ct: ['tipocliente', 'canal', 'segmento', 'tipodecliente', 'customertype', 'ramo', 'classificacao', 'grupoparceiro'],
+                                    c: ['cliente', 'nomefantasia', 'razaosocial', 'parceiro', 'customer', 'pdv', 'loja', 'nome', 'comprador', 'destinatario'],
+                                    d: ['distribuidor', 'revenda', 'distributor', 'fornecedor', 'rede', 'representante', 'vendedor', 'equipe'],
+                                    p: ['produto', 'material', 'descricao', 'product', 'item', 'standard', 'desc', 'sku', 'codigo', 'codigoproduto', 'nomeproduto'],
+                                    s: ['uf', 'estado', 'state', 'ufcliente', 'regiao'],
+                                    ci: ['cidade', 'municipio', 'city', 'local', 'cidadecliente'],
+                                    t: ['unidade', 'filial', 'type', 'empresa'],
+                                    y: ['ano', 'year', 'exercicio'],
+                                    m: ['mes', 'month', 'periodo'],
+                                    dt: ['data', 'emissao', 'date', 'dtemissao', 'criacao', 'lancamento', 'movimento', 'documento', 'dataemissao', 'datavenda', 'mesano'],
+                                    cj: ['cnpj', 'cgc', 'documento', 'cpf', 'doc', 'id', 'cgccpf']
+                                };
+                                const findKey = (aliasArr) => {
+                                    let idx = cleanHeaders.findIndex(k => aliasArr.includes(k));
+                                    if (idx !== -1) return originalHeaders[idx];
+                                    idx = cleanHeaders.findIndex(k => aliasArr.some(alias => k === alias || k.includes(alias)));
+                                    return idx !== -1 ? originalHeaders[idx] : null;
+                                };
+                                keys = { a: findKey(aliases.a), q: findKey(aliases.q), ct: findKey(aliases.ct), c: findKey(aliases.c), d: findKey(aliases.d), p: findKey(aliases.p), s: findKey(aliases.s), ci: findKey(aliases.ci), t: findKey(aliases.t), y: findKey(aliases.y), m: findKey(aliases.m), dt: findKey(aliases.dt), cj: findKey(aliases.cj) };
+                                
+                                if (!keys.a && !keys.q) {
+                                    parser.abort();
+                                    setErrorMsg("Colunas numéricas não encontradas.");
+                                    setIsLoadingAuto(false);
+                                    setShowUploadScreen(true);
+                                    return;
                                 }
-                            });
-                        } catch (outerErr) { setErrorMsg(outerErr.message); setIsLoadingAuto(false); setShowUploadScreen(true); }
-                    }, 50);
-                };
-                reader.onerror = () => { setErrorMsg("Erro na leitura."); setIsLoadingAuto(false); setShowUploadScreen(true); };
-                reader.readAsText(file); if (e.target) e.target.value = null;
+                            }
+
+                            const raw = results.data;
+                            if (!keys || !raw) return;
+
+                            for (let i = 0; i < raw.length; i++) {
+                                const r = raw[i]; const o = {};
+                                o._amount = keys.a ? parseNum(r[keys.a]) : 0; o._qty = keys.q ? parseNum(r[keys.q]) : 0;
+                                if (o._amount === 0 && o._qty === 0) continue;
+                                o._customerType = keys.ct && r[keys.ct] ? String(r[keys.ct]).trim() : 'N/I';
+                                o._customer = keys.c && r[keys.c] ? String(r[keys.c]).trim() : 'Não Informado';
+                                o._distributor = keys.d && r[keys.d] ? String(r[keys.d]).trim() : 'Não Informado';
+                                o._product = keys.p && r[keys.p] ? String(r[keys.p]).trim() : 'Não Informado';
+                                o._state = keys.s && r[keys.s] ? String(r[keys.s]).trim().toUpperCase() : 'N/I';
+                                o._city = keys.ci && r[keys.ci] ? String(r[keys.ci]).trim().toUpperCase() : 'N/I';
+                                o._type = keys.t && r[keys.t] ? String(r[keys.t]).trim() : 'N/I';
+                                o.cnpj = keys.cj && r[keys.cj] ? String(r[keys.cj]).replace(/\D/g, '') : '';
+                                let y = keys.y && r[keys.y] ? parseInt(String(r[keys.y]).replace(/\D/g, ''), 10) : 0; 
+                                let m = keys.m && r[keys.m] ? parseInt(String(r[keys.m]).replace(/\D/g, ''), 10) : 0; 
+                                let dDay = 1; let rDate = keys.dt && r[keys.dt] ? String(r[keys.dt]).trim().split(' ')[0] : ''; let ts = 0; let dDate = '';
+                                if (rDate) {
+                                    if (rDate.includes('/')) { const parts = rDate.split('/'); dDay = parseInt(parts[0], 10) || 1; m = m || parseInt(parts[1], 10); y = y || parseInt(parts[parts.length > 2 ? 2 : 0], 10); } 
+                                    else if (rDate.includes('-')) { const parts = rDate.split('-'); if (parts[0].length === 4) { y = parseInt(parts[0], 10) || 0; m = parseInt(parts[1], 10) || 0; dDay = parseInt(parts[2], 10) || 1; } else { dDay = parseInt(parts[0], 10) || 1; m = parseInt(parts[1], 10) || 0; y = parseInt(parts[2], 10) || 0; } } 
+                                    else if (rDate.length === 8 && !isNaN(rDate)) { y = y || parseInt(rDate.substring(0,4), 10); m = m || parseInt(rDate.substring(4,6), 10); dDay = parseInt(rDate.substring(6,8), 10) || 1; }
+                                }
+                                if (y > 0 && y < 100) y += 2000;
+                                if (y > 0 && m > 0) { ts = new Date(y, m - 1, dDay, 12, 0, 0).getTime(); dDate = `${String(dDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${String(y)}`; } 
+                                else { const now = new Date(); y = now.getFullYear(); m = now.getMonth() + 1; dDay = now.getDate(); ts = new Date(y, m - 1, dDay, 12, 0, 0).getTime(); dDate = `${String(dDay).padStart(2, '0')}/${String(m).padStart(2, '0')}/${String(y)}`; missingDateRows++; }
+                                o._year = y || 0; o._month = m || 0; o._timestamp = ts; o._displayDate = dDate || 'N/I';
+                                o._customerNorm = removeAccents(o._customer).toLowerCase(); o._productNorm = removeAccents(o._product).toLowerCase(); o._cityNorm = removeAccents(o._city).toLowerCase();
+                                if (currentUser && currentUser.role !== 'admin' && !currentUser.estados.includes(o._state)) continue;
+                                if (y > maxFoundYear) maxFoundYear = y;
+                                resData.push(o); if (ts && ts > maxDateTs) maxDateTs = ts; 
+                            }
+                        },
+                        complete: () => {
+                            if (errorMsg) return; 
+                            if (resData.length === 0) {
+                                setErrorMsg("Base lida, mas sem dados válidos para a sua região."); 
+                                setIsLoadingAuto(false);
+                                setShowUploadScreen(true);
+                                return;
+                            }
+                            const wispTypes = [...new Set(resData.map(x => x._customerType))].filter(t => String(t).toUpperCase().includes('WISP'));
+                            setData(resData); setIsLoaded(true); 
+                            const initialF = { searchCustomer: '', searchProduct: '', years: maxFoundYear > 0 ? [String(maxFoundYear)] : [], months: [], state: [], city: [], distributor: [], customerType: wispTypes, type: [], product: [] };
+                            setFilters(initialF); setInitialFilters(initialF);
+                            let warningTxt = missingDateRows > 0 ? ` | Aviso: ${missingDateRows} vendas sem data` : "";
+                            if (maxDateTs > 0) { const d = new Date(maxDateTs); setLastUpdate(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}${warningTxt}`); } 
+                            else { setLastUpdate(`Sincronizado${warningTxt}`); }
+                            setIsLoadingAuto(false);
+                        },
+                        error: (err) => {
+                            setErrorMsg("Erro na leitura: " + err.message); 
+                            setIsLoadingAuto(false); 
+                            setShowUploadScreen(true);
+                        }
+                    });
+                }, 100); 
+                
+                if (e.target) e.target.value = null;
             };
 
             const verifyPassword = () => {
@@ -515,27 +538,36 @@
             const exportToPDF = () => {
                 setIsPdfMode(true);
                 setTimeout(() => {
-                    const element = document.getElementById('main-dashboard-export-area');
-                    if (!element) {
-                        setIsPdfMode(false);
-                        return;
+                    const element = modalConfig.isOpen ? document.getElementById('modal-export-area') : document.getElementById('main-dashboard-export-area');
+                    if (!element) { setIsPdfMode(false); return; }
+                    window.scrollTo(0, 0);
+                    if (modalConfig.isOpen) {
+                        const scrollable = element.querySelector('.modal-scroll');
+                        if (scrollable) scrollable.scrollTop = 0;
                     }
-                    const opt = {
-                        margin:       5,
-                        filename:     `Dashboard_${modalConfig.type || 'Geral'}.pdf`,
-                        image:        { type: 'jpeg', quality: 0.98 },
-                        html2canvas:  { scale: 2, useCORS: true, logging: false },
-                        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' }
-                    };
-                    
-                    window.html2pdf().set(opt).from(element).save().then(() => {
-                        setIsPdfMode(false);
-                    }).catch((err) => {
-                        console.error("Erro ao gerar PDF:", err);
-                        setIsPdfMode(false);
-                    });
-                }, 500); 
+                    let pdfFormat = 'a3'; let pdfUnit = 'mm';
+                    if (!modalConfig.isOpen) {
+                        const w = element.scrollWidth || 1600; const h = element.scrollHeight || 900;
+                        pdfFormat = [w + 20, h + 20]; pdfUnit = 'px';
+                    }
+                    const opt = { margin: [5, 5, 5, 5], filename: `Dashboard_${modalConfig.type || 'Geral'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 }, jsPDF: { unit: pdfUnit, format: pdfFormat, orientation: 'landscape' } };
+                    window.html2pdf().set(opt).from(element).save().then(() => setIsPdfMode(false)).catch((err) => { console.error("Erro ao gerar PDF:", err); setIsPdfMode(false); });
+                }, 1200); 
             };
+
+            const activeFiltersSummary = useMemo(() => {
+                const parts = [];
+                if (filters.searchCustomer) parts.push(`Busca Cliente: "${filters.searchCustomer}"`);
+                if (filters.searchProduct) parts.push(`Busca Produto: "${filters.searchProduct}"`);
+                if (filters.years.length) parts.push(`Anos: ${filters.years.join(', ')}`);
+                if (filters.months.length) parts.push(`Meses: ${filters.months.map(m => MONTH_NAMES[m-1]).join(', ')}`);
+                if (filters.state.length) parts.push(`UF: ${filters.state.join(', ')}`);
+                if (filters.city.length) parts.push(`Cidades: ${filters.city.length} selec.`);
+                if (filters.distributor.length) parts.push(`Distribuidores: ${filters.distributor.length} selec.`);
+                if (filters.customerType.length) parts.push(`Tipos Cli.: ${filters.customerType.length} selec.`);
+                if (filters.type.length) parts.push(`Unidades: ${filters.type.length} selec.`);
+                return parts.length > 0 ? parts.join('  •  ') : 'NENHUM FILTRO APLICADO (VISÃO GLOBAL)';
+            }, [filters]);
 
             const availableOptions = useMemo(() => {
                 if (!data.length) return { years: [], months: [], states: [], cities: [], distributors: [], customerTypes: [], types: [], products: [] };
@@ -567,7 +599,8 @@
                 const availYears = [...new Set(data.map(d => d._year))].filter(y => y > 0).sort((a,b) => b-a); const refYears = filters.years.length > 0 ? filters.years.map(Number).sort((a,b) => a-b) : availYears;
                 if (refYears.length === 0) return { curLabel: '', prevLabel: '', dataCur: [], dataComp: [], curEndAbs: 0, curSpan: 12 };
                 const explicitMonths = filters.months.length > 0 ? filters.months.map(Number).sort((a,b) => a-b) : []; 
-                const yearData = data.filter(d => d._year === refYears[0] && d._month > 0); const maxAvailMonth = yearData.length > 0 ? Math.max(...yearData.map(d => d._month || 1)) : 12;
+                const yearData = data.filter(d => d._year === refYears[0] && d._month > 0);
+                const maxAvailMonth = yearData.length > 0 ? yearData.reduce((max, d) => Math.max(max, d._month || 1), 1) : 12;
                 let curLabel = ''; let prevLabel = ''; let dataCur = []; let dataComp = []; let curEndAbs = 0; let curSpan = 12;
                 const passesBaseFilter = (x) => { if (filters.state.length > 0 && !filters.state.includes(x._state)) return false; if (filters.city.length > 0 && !filters.city.includes(x._city)) return false; if (filters.distributor.length > 0 && !filters.distributor.includes(x._distributor)) return false; if (filters.type.length > 0 && !filters.type.includes(x._type)) return false; if (filters.customerType.length > 0 && !filters.customerType.includes(x._customerType)) return false; if (filters.product.length > 0 && !filters.product.includes(x._product)) return false; const sCTerm = filters.searchCustomer ? removeAccents(filters.searchCustomer).toLowerCase().trim() : ''; const sCDigits = sCTerm.replace(/\D/g, ''); if (sCTerm && !(String(x._customerNorm || '').includes(sCTerm) || (sCDigits && String(x.cnpj || '').includes(sCDigits)))) return false; const sPTerm = filters.searchProduct ? removeAccents(filters.searchProduct).toLowerCase().trim() : ''; if (sPTerm && !String(x._productNorm || '').includes(sPTerm)) return false; return true; };
                 if (timeMode === 'UDM' || timeMode === 'U6M') {
@@ -597,12 +630,10 @@
                 let fatCurTotal = 0; let fatCompTotal = 0; let qtyCurTotal = 0; let qtyCompTotal = 0; const clientsMap = new Map();
                 for (let d of dataCur) { fatCurTotal += d._amount; qtyCurTotal += d._qty; const c = String(d.cnpj || '').replace(/\D/g, ''); if (c) { if (!clientsMap.has(c)) clientsMap.set(c, { cnpj: c, name: d._customer, state: d._state, city: d._city, customerType: d._customerType, fatCur: 0, fatComp: 0, qtyCur: 0, qtyComp: 0, maxDateAbs: 0 }); const o = clientsMap.get(c); o.fatCur += d._amount; o.qtyCur += d._qty; const a = d._year * 12 + d._month; if (a > o.maxDateAbs) o.maxDateAbs = a; } }
                 for (let d of dataComp) { fatCompTotal += d._amount; qtyCompTotal += d._qty; const c = String(d.cnpj || '').replace(/\D/g, ''); if (c) { if (!clientsMap.has(c)) clientsMap.set(c, { cnpj: c, name: d._customer, state: d._state, city: d._city, customerType: d._customerType, fatCur: 0, fatComp: 0, qtyCur: 0, qtyComp: 0, maxDateAbs: 0 }); const o = clientsMap.get(c); o.fatComp += d._amount; o.qtyComp += d._qty; } }
-                
                 const novosList = []; const perdidosList = []; const alertaList = []; const allClientsList = []; let capilaridadeCur = 0; let capilaridadeComp = 0; let fatNovosTotal = 0; let fatPerdidosTotal = 0; let countAlertas = 0;
                 clientsMap.forEach(v => { 
                     const isCurActive = v.fatCur > 0; const isCompActive = v.fatComp > 0; 
-                    v.growth = isCompActive ? ((v.fatCur - v.fatComp) / v.fatComp) * 100 : null; 
-                    v.growthQty = v.qtyComp > 0 ? ((v.qtyCur - v.qtyComp) / v.qtyComp) * 100 : null;
+                    v.growth = isCompActive ? ((v.fatCur - v.fatComp) / v.fatComp) * 100 : null; v.growthQty = v.qtyComp > 0 ? ((v.qtyCur - v.qtyComp) / v.qtyComp) * 100 : null;
                     if (isCurActive) { capilaridadeCur++; allClientsList.push(v); } 
                     if (isCompActive) { capilaridadeComp++; } 
                     if (isCurActive && !isCompActive) { fatNovosTotal += v.fatCur; novosList.push(v); } 
@@ -744,6 +775,7 @@
                 if (!abcDataRaw) return []; return modalAbcFilter !== 'TODOS' ? abcDataRaw.list.filter(x => x.name === modalAbcFilter) : abcDataRaw.list;
             }, [abcDataRaw, modalAbcFilter]);
 
+            // RESOLUÇÃO DE NOMENCLATURA AQUI: Foram unificados para topProdutosFat / topProdutosQty / topDistribuidoresFat / topDistribuidoresQty
             const detailedEntityData = useMemo(() => {
                 if (!['distribuidores', 'produtos', 'top'].includes(modalConfig.type) || !yearComparisonData) return null;
                 const fV = modalConfig.type === 'distribuidores' ? modalDistributorFilter : modalConfig.type === 'produtos' ? modalProductFilter : modalClientFilter;
@@ -784,9 +816,12 @@
                 return {
                     curTotal, prevTotal, curQtyTotal, prevQtyTotal, capilaridade: clientsSet.size, 
                     growth: prevTotal > 0 ? ((curTotal - prevTotal) / prevTotal) * 100 : null, growthQty: prevQtyTotal > 0 ? ((curQtyTotal - prevQtyTotal) / prevQtyTotal) * 100 : null,
-                    topProductsFat: toArr(pMap).sort((a,b) => b.valor - a.valor).slice(0,5), topProductsQty: toArr(pMap).sort((a,b) => b.qty - a.qty).slice(0,5),
-                    topClientsFat: toArr(cMap).sort((a,b) => b.valor - a.valor).slice(0,100), topClientsQty: toArr(cMap).sort((a,b) => b.qty - a.qty).slice(0,100),
-                    topDistributorsFat: toArr(dMap).sort((a,b) => b.valor - a.valor).slice(0,5), topDistribuidoresQty: toArr(dMap).sort((a,b) => b.qty - a.qty).slice(0,5),
+                    topProdutosFat: toArr(pMap).sort((a,b) => b.valor - a.valor).slice(0,5), 
+                    topProdutosQty: toArr(pMap).sort((a,b) => b.qty - a.qty).slice(0,5),
+                    topClientsFat: toArr(cMap).sort((a,b) => b.valor - a.valor).slice(0,100), 
+                    topClientsQty: toArr(cMap).sort((a,b) => b.qty - a.qty).slice(0,100),
+                    topDistribuidoresFat: toArr(dMap).sort((a,b) => b.valor - a.valor).slice(0,5), 
+                    topDistribuidoresQty: toArr(dMap).sort((a,b) => b.qty - a.qty).slice(0,5),
                     monthlyTrend: Array.from(monthMap.values()).sort((a,b) => a.sort - b.sort), avgPrice: curQtyTotal > 0 ? curTotal / curQtyTotal : 0, lastPrice, rank, entityCnpj, entityName
                 };
             }, [yearComparisonData, modalConfig.type, modalDistributorFilter, modalProductFilter, modalClientFilter, modalUfFilter, topDistribuidoresGlobal, topProductsGlobal, globalMetrics.allClientsRanked]);
@@ -905,9 +940,9 @@
                     if (x.fatComp > 0) {
                         g = ((x.fatCur - x.fatComp) / x.fatComp) * 100;
                     } else if (x.fatCur > 0 && x.fatComp === 0) {
-                        g = 100; // Item novo s/ histórico recebe 100% de crescimento (Aposta/Estrela)
+                        g = 100;
                     } else if (x.fatCur === 0 && x.fatComp > 0) {
-                        g = -100; // Item inativo (Churn) recebe -100%
+                        g = -100;
                     }
                     return { ...x, growth: g };
                 });
@@ -964,8 +999,9 @@
                     dTE = listToExport.map(d => ({ 'Rank': d.rank, 'Nome': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Faturamento (R$)': fNf(d.amount), 'Repres. (%)': fNf(d.pct), 'Acumulada (%)': fNf(d.accPct), 'Curva': String(d.curve) }));
                 } else if (['novos', 'perdidos', 'alerta'].includes(modalConfig.type) || modalConfig.type === 'top') { 
                     if (modalConfig.type === 'top' && modalClientFilter !== 'TODOS') { 
-                        const dists = modalEvolucaoMode === 'faturamento' ? detailedEntityData.topDistributorsFat : detailedEntityData.topDistribuidoresQty;
-                        dTE = dists.map((c,i) => ({ 'Rank': i + 1, 'Distribuidor': String(c.name), 'Faturamento (R$)': fNf(c.valor), 'Quantidade': fI(c.qty), 'Repres. (%)': fNf((c.valor / detailedEntityData.curTotal) * 100) }));
+                        // Corrigido aqui também para coincidir com a nomenclatura unificada
+                        const dists = modalEvolucaoMode === 'faturamento' ? detailedEntityData.topDistribuidoresFat : detailedEntityData.topDistribuidoresQty;
+                        dTE = dists.map((c,i) => ({ 'Rank': i + 1, 'Distribuidor': String(c.name), 'Faturamento (R$)': fNf(c.valor), 'Quantidade': fI(c.qty), 'Preço Médio (R$)': fNf(c.qty > 0 ? c.valor / c.qty : 0), 'Repres. (%)': fNf((c.valor / detailedEntityData.curTotal) * 100) }));
                         fN = `distribuidores_cliente_${modalClientFilter}`;
                     } else { 
                         const sourceList = modalConfig.type === 'top' ? sortedClientsList : filteredModalDataList;
@@ -975,7 +1011,7 @@
                     dTE = modalPrecosData.map(p => ({ 'Produto': String(p.name), 'Qtd Vendida': fI(p.qty), 'Faturamento Total (R$)': fNf(p.amount), 'Menor Preço (R$)': fNf(p.min), 'Preço Médio (R$)': fNf(p.avg), 'Último Preço (R$)': fNf(p.lastPrice), 'Data Menor': String(p.minDate || ''), 'Data Último': String(p.lastDateLabel || '') }));
                 } else if (['distribuidores', 'produtos'].includes(modalConfig.type)) {
                     const clients = modalEvolucaoMode === 'faturamento' ? detailedEntityData.topClientsFat : detailedEntityData.topClientsQty; 
-                    dTE = clients.map((c,i) => ({ 'Rank': i + 1, 'Cliente': String(c.name), 'Tipo Cliente': String(c.customerType), 'UF': String(c.state), 'Cidade': String(c.city), 'Faturamento (R$)': fNf(c.valor), 'Quantidade': fI(c.qty), 'Repres. (%)': fNf((c.valor / detailedEntityData.curTotal) * 100) }));
+                    dTE = clients.map((c,i) => ({ 'Rank': i + 1, 'Cliente': String(c.name), 'Tipo Cliente': String(c.customerType), 'UF': String(c.state), 'Cidade': String(c.city), 'Faturamento (R$)': fNf(c.valor), 'Quantidade': fI(c.qty), 'Preço Médio (R$)': fNf(c.qty > 0 ? c.valor / c.qty : 0), 'Repres. (%)': fNf((c.valor / detailedEntityData.curTotal) * 100) }));
                 } else if (modalConfig.type === 'capilaridade') {
                      dTE = [{'Aviso': 'Visão gráfica apenas'}];
                 }
@@ -1045,16 +1081,95 @@
                                     <DataTable cols={colsOpps} data={representatividadeDetails.opportunities.slice(0, 50)} onRowClick={(r) => setSelectedOpportunity(r.name === selectedOpportunity ? null : r.name)} selectedRowValue={selectedOpportunity} rowKey="name" />
                                 </div>
                             )}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                <MiniBarChart data={representatividadeDetails.topProducts} color="#3b82f6" isFat={true} title="Top 10 Produtos" />
-                                <MiniBarChart data={representatividadeDetails.topClients} color="#f59e0b" isFat={true} title="Top 10 Clientes" />
-                            </div>
+                            
                             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                                 <h4 className="text-[9px] font-black text-slate-800 uppercase tracking-wider p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                                     <div className="flex items-center gap-1.5"><Icon name="Users" size={12} className="text-blue-600"/>{selectedOpportunity ? <span className="text-blue-700">Alvos para oferecer: <span className="bg-blue-100 px-1.5 py-0.5 rounded">{String(selectedOpportunity)}</span></span> : <span>Contatos Alvo</span>}</div>
                                     {selectedOpportunity && <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-200">{Number(cList.length)} clientes s/ item</span>}
                                 </h4>
                                 <DataTable cols={colsClients} data={cList.slice(0, 50)} />
+                            </div>
+                        </div>
+                    );
+                }
+
+                if (['distribuidores', 'produtos', 'top'].includes(modalConfig.type) && detailedEntityData) {
+                    const d = detailedEntityData; 
+                    const isF = modalEvolucaoMode === 'faturamento';
+                    
+                    const cards = modalConfig.type === 'produtos' ? [
+                        { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: isF ? formatCurrency(d.curTotal) : `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un`, g1: isF ? d.growth : d.growthQty, b: getRankBadge(d.rank) },
+                        { t1: isF ? 'Volume Atual' : 'Faturamento Atual', v1: isF ? `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un` : formatCurrency(d.curTotal), g1: isF ? d.growthQty : d.growth },
+                        { t1: 'Preço Médio vs Último', v1: `R$ ${Number(d.avgPrice || 0).toFixed(2)}`, s: `Último praticado a: R$ ${Number(d.lastPrice || 0).toFixed(2)}` }
+                    ] : modalConfig.type === 'top' ? [
+                        { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: isF ? formatCurrency(d.curTotal) : `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un`, g1: isF ? d.growth : d.growthQty, b: getRankBadge(d.rank) },
+                        { t1: isF ? 'Volume Atual' : 'Faturamento Atual', v1: isF ? `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un` : formatCurrency(d.curTotal), g1: isF ? d.growthQty : d.growth },
+                        { t1: isF ? 'Média Mensal (R$)' : 'Média Mensal (Un)', v1: isF ? formatCurrency(d.curTotal / (yearComparisonData?.curSpan || 12)) : `${(d.curQtyTotal / (yearComparisonData?.curSpan || 12)).toFixed(1)} un`, s: `/ ${Number(yearComparisonData?.curSpan || 12)} meses` }
+                    ] : [
+                        { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: isF ? formatCurrency(d.curTotal) : `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un`, g1: isF ? d.growth : d.growthQty, b: getRankBadge(d.rank) },
+                        { t1: 'Capilaridade', v1: `${Number(d.capilaridade || 0).toLocaleString('pt-BR')} PDVs`, s: 'Neste ciclo' },
+                        { t1: isF ? 'Média / PDV (R$)' : 'Média / PDV (Un)', v1: d.capilaridade > 0 ? (isF ? formatCurrency(d.curTotal / d.capilaridade) : `${(d.curQtyTotal / d.capilaridade).toFixed(1)} un`) : (isF ? 'R$ 0,00' : '0 un'), s: isF ? 'Ticket Médio' : 'Volume Médio' }
+                    ];
+
+                    const isClientRank = modalConfig.type === 'top' && modalClientFilter === 'TODOS'; 
+                    const isClientDist = modalConfig.type === 'top' && modalClientFilter !== 'TODOS';
+                    
+                    const colsRank = isClientRank ? [ 
+                        {label:'Rank', align:'text-center', val:r=><span className="text-slate-400 font-bold">{"#" + String(r.rank)}</span>}, 
+                        {label:'Cliente', val:r=><div className="text-slate-800 font-bold truncate max-w-[200px]">{String(r.name)}</div>, sort:()=>setClientSortConfig(p=>({column:'name',direction:p.column==='name'&&p.direction==='desc'?'asc':'desc'})), activeSort:clientSortConfig.column==='name', sortDir:clientSortConfig.direction}, 
+                        {label:'UF', align:'text-center', val:r=><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold">{String(r.state)}</span>}, 
+                        {label:'Cidade', val:r=><span className="text-[8px] text-slate-600 font-semibold">{String(r.city)}</span>}, 
+                        {label:isF ? 'Fat. Atual' : 'Vol. Atual', align:'text-right', val:r=><span className="font-bold text-slate-800">{isF ? formatCurrency(r.fatCur) : `${Number(r.qtyCur||0).toLocaleString('pt-BR')} un`}</span>, sort:()=>setClientSortConfig(p=>({column:isF?'fatCur':'qtyCur',direction:p.column===(isF?'fatCur':'qtyCur')&&p.direction==='desc'?'asc':'desc'})), activeSort:clientSortConfig.column===(isF?'fatCur':'qtyCur'), sortDir:clientSortConfig.direction}, 
+                        {label:isF ? 'Fat. Ant.' : 'Vol. Ant.', align:'text-right', val:r=><span className="text-slate-500 font-bold">{isF ? formatCurrency(r.fatComp) : `${Number(r.qtyComp||0).toLocaleString('pt-BR')} un`}</span>}, 
+                        {label:'Crescimento', align:'text-right', val:r=>{
+                            const g = isF ? r.growth : r.growthQty;
+                            return g!==null&&g!==undefined?<span className={`px-2 py-0.5 rounded text-[8px] font-bold ${g>0?'bg-emerald-50 text-emerald-600':g<0?'bg-rose-50 text-rose-600':'bg-slate-50 text-slate-600'}`}>{g>0?'+':''}{Number(g || 0).toFixed(1)}%</span>:<span className="text-slate-400">-</span>
+                        }, sort:()=>setClientSortConfig(p=>({column:isF?'growth':'growthQty',direction:p.column===(isF?'growth':'growthQty')&&p.direction==='desc'?'asc':'desc'})), activeSort:clientSortConfig.column===(isF?'growth':'growthQty'), sortDir:clientSortConfig.direction} 
+                    ] : isClientDist ? [ 
+                        {label:'Distribuidor', val:r=><div className="font-bold text-slate-700">{String(r.name)}</div>}, 
+                        {label:'Faturamento', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>}, 
+                        {label:'Qtd.', align:'text-right', val:r=><span className="font-bold text-slate-600">{Number(r.qty)} un</span>}, 
+                        {label:'Preço Médio', align:'text-right', val:r=><span className="font-bold text-indigo-600">{formatCurrency(r.qty > 0 ? r.valor / r.qty : 0)}</span>},
+                        {label:'% Repres.', align:'text-right', val:r=><span className="font-bold text-emerald-600">{isF ? (d.curTotal>0?((r.valor/d.curTotal)*100).toFixed(1):'0.0') : (d.curQtyTotal>0?((r.qty/d.curQtyTotal)*100).toFixed(1):'0.0')}%</span>} 
+                    ] : [ 
+                        {label:'Cliente', val:r=><div className="font-bold text-slate-700 truncate max-w-[150px]">{String(r.name)}</div>}, 
+                        {label:'UF', align:'text-center', val:r=><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold">{String(r.state)}</span>}, 
+                        {label:'Cidade', val:r=><span className="text-[8px] text-slate-600 font-semibold">{String(r.city)}</span>}, 
+                        {label:'Faturamento', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>}, 
+                        {label:'Qtd.', align:'text-right', val:r=><span className="font-bold text-slate-600">{Number(r.qty)} un</span>}, 
+                        {label:'Preço Médio', align:'text-right', val:r=><span className="font-bold text-emerald-600">{formatCurrency(r.qty > 0 ? r.valor / r.qty : 0)}</span>},
+                        {label:'% Repres.', align:'text-right', val:r=><span className="font-bold text-blue-600">{isF ? (d.curTotal>0?((r.valor/d.curTotal)*100).toFixed(1):'0.0') : (d.curQtyTotal>0?((r.qty/d.curQtyTotal)*100).toFixed(1):'0.0')}%</span>} 
+                    ];
+
+                    return (
+                        <div className="p-3 lg:p-4 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                {cards.map((x,i) => (
+                                    <div key={i} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+                                        <div className="flex justify-between items-start"><p className="text-[8px] font-black text-slate-400 uppercase">{String(x.t1)}</p>{x.b}</div>
+                                        <h3 className="text-lg font-black mt-1 text-blue-600">{String(x.v1)}</h3>
+                                        {x.g1 !== undefined && x.g1 !== null ? (
+                                            <div className="mt-1"><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${x.g1>0?'bg-emerald-50 text-emerald-600':x.g1<0?'bg-rose-50 text-rose-600':'bg-slate-50 text-slate-500'}`}>{x.g1>0?'+':''}{Number(x.g1 || 0).toFixed(1)}% vs Ant.</span></div>
+                                        ) : (
+                                            <p className="text-[8px] text-slate-400 font-bold mt-1">{x.s ? String(x.s) : ''}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            {!isClientDist && (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                    <MiniLineChart data={d.monthlyTrend} isFat={isF} setMode={setModalEvolucaoMode} />
+                                    {/* Alteração crítica AQUI para ler os arrays com a nomenclatura correta */}
+                                    <MiniBarChart data={modalConfig.type === 'produtos' ? (isF ? d.topDistribuidoresFat : d.topDistribuidoresQty) : (isF ? d.topProdutosFat : d.topProdutosQty)} color={modalConfig.type === 'produtos' ? "#10b981" : "#3b82f6"} isFat={isF} title={modalConfig.type === 'produtos' ? 'Top Distribuidores' : 'Top Produtos'} />
+                                </div>
+                            )}
+
+                            <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
+                                <h4 className="text-[9px] font-black text-slate-800 uppercase tracking-wider p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                                    {isClientRank ? 'Ranking de Clientes' : isClientDist ? 'Relacionamento com Distribuidores' : 'Principais Compradores'}
+                                </h4>
+                                <DataTable cols={colsRank} data={isClientRank ? sortedClientsList.slice(0, 100) : (isClientDist ? (isF ? d.topDistribuidoresFat : d.topDistribuidoresQty) : (isF ? d.topClientsFat : d.topClientsQty).slice(0, 100))} />
                             </div>
                         </div>
                     );
@@ -1095,10 +1210,10 @@
                                             <YAxis yAxisId="left" tickFormatter={v=>`${(v/1000000).toFixed(1)}M`} tick={{fontSize: 9, fontWeight: 600, fill: '#94a3b8'}} axisLine={false} tickLine={false} width={35} />
                                             <YAxis yAxisId="right" orientation="right" tickFormatter={v=>`${v}%`} tick={{fontSize: 9, fontWeight: 600, fill: '#94a3b8'}} axisLine={false} tickLine={false} domain={[0, 100]} width={25} />
                                             <Tooltip content={<CustomAbcTooltip />} />
-                                            <Bar yAxisId="left" dataKey="amount" radius={[3, 3, 0, 0]}>
+                                            <Bar yAxisId="left" dataKey="amount" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                                                 {abcDataRaw.list.slice(0, 50).map((e, i) => <Cell key={"cell-" + i} fill={e.curve === 'A' ? '#10b981' : e.curve === 'B' ? '#3b82f6' : '#cbd5e1'} />)}
                                             </Bar>
-                                            <Line yAxisId="right" type="monotone" dataKey="accPct" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                                            <Line yAxisId="right" type="monotone" dataKey="accPct" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -1144,81 +1259,6 @@
                                 ))}
                             </div>
                             <DataTable cols={colsMatriz} data={scatterPlotData.filtered.slice(0, 200)} footer={<tr><td colSpan="5" className="py-4 text-center text-[10px] font-bold text-slate-500">Exibindo os primeiros {Math.min(200, scatterPlotData.filtered.length)} itens na tela.</td></tr>} />
-                        </div>
-                    );
-                }
-
-                if (['distribuidores', 'produtos', 'top'].includes(modalConfig.type) && detailedEntityData) {
-                    const d = detailedEntityData; const isF = modalEvolucaoMode === 'faturamento';
-                    const cards = modalConfig.type === 'produtos' ? [
-                        { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: isF ? formatCurrency(d.curTotal) : `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un`, g1: isF ? d.growth : d.growthQty, b: getRankBadge(d.rank) },
-                        { t1: isF ? 'Volume Atual' : 'Faturamento Atual', v1: isF ? `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un` : formatCurrency(d.curTotal), g1: isF ? d.growthQty : d.growth },
-                        { t1: 'Preço Médio vs Último', v1: `R$ ${Number(d.avgPrice || 0).toFixed(2)}`, s: `Último praticado a: R$ ${Number(d.lastPrice || 0).toFixed(2)}` }
-                    ] : modalConfig.type === 'top' ? [
-                        { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: isF ? formatCurrency(d.curTotal) : `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un`, g1: isF ? d.growth : d.growthQty, b: getRankBadge(d.rank) },
-                        { t1: isF ? 'Volume Atual' : 'Faturamento Atual', v1: isF ? `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un` : formatCurrency(d.curTotal), g1: isF ? d.growthQty : d.growth },
-                        { t1: isF ? 'Média Mensal (R$)' : 'Média Mensal (Un)', v1: isF ? formatCurrency(d.curTotal / (yearComparisonData?.curSpan || 12)) : `${(d.curQtyTotal / (yearComparisonData?.curSpan || 12)).toFixed(1)} un`, s: `/ ${Number(yearComparisonData?.curSpan || 12)} meses` }
-                    ] : [
-                        { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: isF ? formatCurrency(d.curTotal) : `${Number(d.curQtyTotal || 0).toLocaleString('pt-BR')} un`, g1: isF ? d.growth : d.growthQty, b: getRankBadge(d.rank) },
-                        { t1: 'Capilaridade', v1: `${Number(d.capilaridade || 0).toLocaleString('pt-BR')} PDVs`, s: 'Neste ciclo' },
-                        { t1: isF ? 'Média / PDV (R$)' : 'Média / PDV (Un)', v1: d.capilaridade > 0 ? (isF ? formatCurrency(d.curTotal / d.capilaridade) : `${(d.curQtyTotal / d.capilaridade).toFixed(1)} un`) : (isF ? 'R$ 0,00' : '0 un'), s: isF ? 'Ticket Médio' : 'Volume Médio' }
-                    ];
-
-                    const isClientRank = modalConfig.type === 'top' && modalClientFilter === 'TODOS'; 
-                    const isClientSelected = modalConfig.type === 'top' && modalClientFilter !== 'TODOS';
-                    
-                    const colsRank = isClientRank ? [ 
-                        {label:'Rank', align:'text-center', val:r=><span className="text-slate-400 font-bold">{"#" + String(r.rank)}</span>}, 
-                        {label:'Cliente', val:r=><div className="text-slate-800 font-bold truncate max-w-[200px]">{String(r.name)}</div>, sort:()=>setClientSortConfig(p=>({column:'name',direction:p.column==='name'&&p.direction==='desc'?'asc':'desc'})), activeSort:clientSortConfig.column==='name', sortDir:clientSortConfig.direction}, 
-                        {label:'UF', align:'text-center', val:r=><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold">{String(r.state)}</span>}, 
-                        {label:'Cidade', val:r=><span className="text-[8px] text-slate-600 font-semibold">{String(r.city)}</span>}, 
-                        {label:isF ? 'Fat. Atual' : 'Vol. Atual', align:'text-right', val:r=><span className="font-bold text-slate-800">{isF ? formatCurrency(r.fatCur) : `${Number(r.qtyCur||0).toLocaleString('pt-BR')} un`}</span>, sort:()=>setClientSortConfig(p=>({column:isF?'fatCur':'qtyCur',direction:p.column===(isF?'fatCur':'qtyCur')&&p.direction==='desc'?'asc':'desc'})), activeSort:clientSortConfig.column===(isF?'fatCur':'qtyCur'), sortDir:clientSortConfig.direction}, 
-                        {label:isF ? 'Fat. Ant.' : 'Vol. Ant.', align:'text-right', val:r=><span className="text-slate-500 font-bold">{isF ? formatCurrency(r.fatComp) : `${Number(r.qtyComp||0).toLocaleString('pt-BR')} un`}</span>}, 
-                        {label:'Crescimento', align:'text-right', val:r=>{
-                            const g = isF ? r.growth : r.growthQty;
-                            return g!==null&&g!==undefined?<span className={`px-2 py-0.5 rounded text-[8px] font-bold ${g>0?'bg-emerald-50 text-emerald-600':g<0?'bg-rose-50 text-rose-600':'bg-slate-50 text-slate-600'}`}>{g>0?'+':''}{Number(g || 0).toFixed(1)}%</span>:<span className="text-slate-400">-</span>
-                        }, sort:()=>setClientSortConfig(p=>({column:isF?'growth':'growthQty',direction:p.column===(isF?'growth':'growthQty')&&p.direction==='desc'?'asc':'desc'})), activeSort:clientSortConfig.column===(isF?'growth':'growthQty'), sortDir:clientSortConfig.direction} 
-                    ] : isClientSelected ? [ 
-                        {label:'Distribuidor', val:r=><div className="font-bold text-slate-700">{String(r.name)}</div>}, 
-                        {label:'Faturamento', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>}, 
-                        {label:'Qtd.', align:'text-right', val:r=><span className="font-bold text-slate-600">{Number(r.qty)} un</span>}, 
-                        {label:'% Repres.', align:'text-right', val:r=><span className="font-bold text-emerald-600">{isF ? (d.curTotal>0?((r.valor/d.curTotal)*100).toFixed(1):'0.0') : (d.curQtyTotal>0?((r.qty/d.curQtyTotal)*100).toFixed(1):'0.0')}%</span>} 
-                    ] : [ 
-                        {label:'Cliente', val:r=><div className="font-bold text-slate-700 truncate max-w-[150px]">{String(r.name)}</div>}, 
-                        {label:'UF', align:'text-center', val:r=><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold">{String(r.state)}</span>}, 
-                        {label:'Cidade', val:r=><span className="text-[8px] text-slate-600 font-semibold">{String(r.city)}</span>}, 
-                        {label:'Faturamento', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>}, 
-                        {label:'Qtd.', align:'text-right', val:r=><span className="font-bold text-slate-600">{Number(r.qty)} un</span>}, 
-                        {label:'% Repres.', align:'text-right', val:r=><span className="font-bold text-blue-600">{isF ? (d.curTotal>0?((r.valor/d.curTotal)*100).toFixed(1):'0.0') : (d.curQtyTotal>0?((r.qty/d.curQtyTotal)*100).toFixed(1):'0.0')}%</span>} 
-                    ];
-
-                    return (
-                        <div className="p-3 lg:p-4 space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                {cards.map((x,i) => (
-                                    <div key={i} className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
-                                        <div className="flex justify-between items-start"><p className="text-[8px] font-black text-slate-400 uppercase">{String(x.t1)}</p>{x.b}</div>
-                                        <h3 className="text-lg font-black mt-1 text-blue-600">{String(x.v1)}</h3>
-                                        {x.g1 !== undefined && x.g1 !== null ? (
-                                            <div className="mt-1"><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${x.g1>0?'bg-emerald-50 text-emerald-600':x.g1<0?'bg-rose-50 text-rose-600':'bg-slate-50 text-slate-500'}`}>{x.g1>0?'+':''}{Number(x.g1 || 0).toFixed(1)}% vs Ant.</span></div>
-                                        ) : (
-                                            <p className="text-[8px] text-slate-400 font-bold mt-1">{x.s ? String(x.s) : ''}</p>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                <MiniLineChart data={d.monthlyTrend} isFat={isF} setMode={setModalEvolucaoMode}/>
-                                <MiniBarChart data={modalConfig.type === 'produtos' ? (isF ? d.topDistributorsFat : d.topDistribuidoresQty) : (isF ? d.topProductsFat : d.topProductsQty)} color={modalConfig.type === 'produtos' ? "#10b981" : "#3b82f6"} isFat={isF} title={modalConfig.type === 'produtos' ? 'Top Distribuidores' : 'Top Produtos'}/>
-                            </div>
-
-                            <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
-                                <h4 className="text-[9px] font-black text-slate-800 uppercase p-3 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5">
-                                    {isClientRank ? 'Ranking de Clientes' : isClientSelected ? <><Icon name="Truck" size={14}/>Relacionamento com Distribuidores</> : 'Principais Compradores'}
-                                </h4>
-                                <DataTable cols={colsRank} data={isClientRank ? sortedClientsList.slice(0, 100) : isClientSelected ? (isF ? d.topDistributorsFat : d.topDistribuidoresQty) : (isF ? d.topClientsFat : d.topClientsQty).slice(0, 100)} />
-                            </div>
                         </div>
                     );
                 }
@@ -1275,8 +1315,8 @@
                                     <YAxis axisLine={false} tickLine={false} tick={{fontSize:9, fontWeight:600, fill:'#94a3b8'}} />
                                     <Tooltip formatter={(v, n) => [Number(v||0).toLocaleString('pt-BR') + " PDVs", isCompareUFModal ? String(n) : "Período: " + String(n)]} contentStyle={{borderRadius:'8px', border:'none', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)'}} />
                                     <Legend verticalAlign="top" height={24} iconType="circle" wrapperStyle={{fontSize:'9px', fontWeight:'bold', color:'#64748b'}} />
-                                    <Line type="monotone" dataKey="Total" name="Total Agrupado" stroke="#0f172a" strokeWidth={3} dot={{r:3, strokeWidth:2}} activeDot={{r:5}} connectNulls={false} />
-                                    {ufsToPlotCapilaridade.map((u, i) => <Line key={String(u)} type="monotone" dataKey={String(u)} name={String(u)} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={{r:2, strokeWidth:1}} activeDot={{r:4}} connectNulls={false} />)}
+                                    <Line type="monotone" dataKey="Total" name="Total Agrupado" stroke="#0f172a" strokeWidth={3} dot={{r:3, strokeWidth:2}} activeDot={{r:5}} connectNulls={false} isAnimationActive={false} />
+                                    {ufsToPlotCapilaridade.map((u, i) => <Line key={String(u)} type="monotone" dataKey={String(u)} name={String(u)} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={{r:2, strokeWidth:1}} activeDot={{r:4}} connectNulls={false} isAnimationActive={false} />)}
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
@@ -1385,7 +1425,7 @@
                                         </div>
                                         <div className="p-5 border border-amber-200 bg-amber-50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                                             <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 bg-amber-500 rounded-sm"></div><h4 className="font-black text-amber-800 text-[11px] uppercase">Apostas</h4></div>
-                                            <p className="text-amber-700 leading-relaxed"><b>Baixa Faturação + Alto Crescimento.</b> Pequenos clientes/produtos que estão a acelerar mais rápido do que a média de mercado.<br/><br/><b>Estratégia:</b> Treinar o comercial para impulsionar estes clientes. São os talentos do futuro e as futuras Estrelas do seu portefólio.</p>
+                                            <p className="text-amber-700 leading-relaxed"><b>Baixa Faturação + Alto Crescimento.</b> Pequenos clientes/produtos que estão a acelerar mais rápido do que a média de mercado.<br/><br/><b>Estratégia:</b> Treinar o comercial para impulsionar estes clientes. São os talentos do futuro e as futuras Estrelas do seu portfólio.</p>
                                         </div>
                                         <div className="p-5 border border-rose-200 bg-rose-50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                                             <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 bg-rose-500 rounded-sm"></div><h4 className="font-black text-rose-800 text-[11px] uppercase">Abacaxis</h4></div>
@@ -1428,6 +1468,16 @@
                     </div>
                 );
             };
+
+            if (isLoadingAuto) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 animate-fade-in">
+                        <Icon name="Loader2" size={48} className="text-blue-600 mb-6" />
+                        <h2 className="text-xl md:text-2xl font-black text-slate-800 mb-2">A processar matriz de dados...</h2>
+                        <p className="text-xs md:text-sm text-slate-500 font-semibold text-center max-w-md">Isto pode demorar alguns segundos dependendo do tamanho da base.</p>
+                    </div>
+                );
+            }
 
             if (!isLoaded || showUploadScreen) return (
                 <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
@@ -1481,7 +1531,14 @@
 
             return (
                 <div id="main-dashboard-export-area" className={`max-w-[1600px] mx-auto p-2 lg:p-3 text-slate-900 flex flex-col gap-1.5 ${modalConfig.isOpen ? 'has-modal' : ''} ${isPdfMode ? 'pdf-mode' : ''}`}>
-                    <div className={modalConfig.isOpen ? 'print:hidden' : ''}>
+                    {isPdfMode && (
+                        <div className="fixed inset-0 z-[99999] bg-slate-900/80 flex flex-col items-center justify-center text-white no-export" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+                            <Icon name="Loader2" size={64} className="animate-spin text-blue-500 mb-6" />
+                            <h2 className="text-3xl font-black mb-2">A Exportar PDF...</h2>
+                            <p className="text-sm font-semibold text-slate-300">O ecrã vai congelar por uns segundos. É normal, aguarde.</p>
+                        </div>
+                    )}
+                    <div className={modalConfig.isOpen ? 'print:hidden main-dashboard-content' : 'main-dashboard-content'}>
                         {/* Cabeçalho Principal do Dashboard */}
                         <div className="bg-white p-2 lg:p-3 rounded-xl border border-slate-200 shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-1.5">
                             <div className="flex items-center gap-3">
@@ -1523,6 +1580,17 @@
                                 <button onClick={()=>{setShowUploadScreen(true);setIsLoaded(false);setCurrentUser(null);setPasswordValue('');setIsAdminVerified(false);}} className="flex items-center gap-1 bg-slate-100 text-slate-500 border border-slate-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 shadow-sm" title="Sair do Sistema"><Icon name="UserMinus" size={10}/> Sair</button>
                             </div>
                         </div>
+
+                        {/* Filtros Ativos para Impressão PDF */}
+                        {isPdfMode && !modalConfig.isOpen && (
+                            <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 shadow-sm flex items-start gap-2 mb-1.5 animate-fade-in">
+                                <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600 shrink-0"><Icon name="Filter" size={14} /></div>
+                                <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-blue-800 uppercase tracking-widest">Filtros Aplicados no PDF:</span>
+                                    <span className="text-[10px] font-bold text-blue-900 mt-0.5 leading-snug">{activeFiltersSummary}</span>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Filtros */}
                         <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-md flex flex-wrap gap-2 items-end mb-1.5 no-export">
@@ -1575,7 +1643,7 @@
                                             {evolutionChartData.lines.map((y, i) => {
                                                 const isNewest = y === Math.max(...evolutionChartData.lines);
                                                 const color = evolutionChartData.lines.length === 2 ? (isNewest ? '#3b82f6' : '#cbd5e1') : CHART_COLORS[i % CHART_COLORS.length];
-                                                return <Line key={String(y)} type="monotone" dataKey={y} name={String(y)} stroke={color} strokeWidth={2.5} dot={{r: 2.5, strokeWidth: 1.5}} activeDot={{r: 4}} connectNulls={false} />
+                                                return <Line key={String(y)} type="monotone" dataKey={y} name={String(y)} stroke={color} strokeWidth={2.5} dot={{r: 2.5, strokeWidth: 1.5}} activeDot={{r: 4}} isAnimationActive={false} connectNulls={false} />
                                             })}
                                         </LineChart>
                                     </ResponsiveContainer>
@@ -1599,7 +1667,7 @@
                                 </div>
                                 <div className="h-[220px] w-full flex-1 relative">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <Treemap data={pieChartDataMain} dataKey="value" stroke="#fff" content={(props) => <CustomTreemapContentRecharts {...props} />}>
+                                        <Treemap data={pieChartDataMain} dataKey="value" stroke="#fff" isAnimationActive={false} content={(props) => <CustomTreemapContentRecharts {...props} />}>
                                             <Tooltip content={(props) => <CustomUFTooltip {...props} />} />
                                         </Treemap>
                                     </ResponsiveContainer>
@@ -1650,7 +1718,7 @@
                                         <Tooltip cursor={{strokeDasharray: '3 3'}} content={(props) => <CustomScatterTooltip {...props} />} />
                                         <ReferenceLine y={scatterPlotData.avgFat} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideTopLeft', value: 'Média Fat.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
                                         <ReferenceLine x={scatterPlotData.thresholdG} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideBottomRight', value: scatterPlotData.avgGrowth < 0 ? 'Mín (0%)' : 'Média Cresc.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
-                                        <Scatter name="Performance" data={scatterPlotData.filtered} fillOpacity={0.8}>
+                                        <Scatter name="Performance" data={scatterPlotData.filtered} fillOpacity={0.8} isAnimationActive={false}>
                                             {scatterPlotData.filtered.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fillHex} />)}
                                         </Scatter>
                                     </ScatterChart>
@@ -1667,82 +1735,90 @@
 
                     {/* Modais Analíticos em Tela Cheia */}
                     {modalConfig.isOpen && (
-                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 md:p-6 print:static print:bg-transparent print:backdrop-blur-none print:p-0">
-                            <div className="bg-white rounded-2xl md:rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in print-modal-wrapper print:shadow-none print:border-none print:rounded-none print:max-h-none">
-                                <div className="p-4 lg:p-5 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50 gap-4 shrink-0 md:rounded-t-3xl">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${['novos','distribuidores'].includes(modalConfig.type)?'text-emerald-600 bg-emerald-100':['perdidos'].includes(modalConfig.type)?'text-rose-600 bg-rose-100':['top'].includes(modalConfig.type)?'text-fuchsia-600 bg-fuchsia-100':['alerta'].includes(modalConfig.type)?'text-amber-600 bg-amber-100':['preco','produtos','matriz','representatividade'].includes(modalConfig.type)?'text-blue-600 bg-blue-100':['abc'].includes(modalConfig.type)?'text-indigo-600 bg-indigo-100':'text-slate-600 bg-slate-100'}`}>
-                                            <Icon name={IconName} size={20}/>
+                        <div className={`fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 md:p-6 modal-overlay-bg`}>
+                            <div id="modal-export-area" className={`bg-white rounded-2xl md:rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in relative print-modal-wrapper`}>
+                                <div className="p-4 lg:p-5 border-b border-slate-100 flex flex-col bg-slate-50 gap-3 shrink-0 md:rounded-t-3xl">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${['novos','distribuidores'].includes(modalConfig.type)?'text-emerald-600 bg-emerald-100':['perdidos'].includes(modalConfig.type)?'text-rose-600 bg-rose-100':['top'].includes(modalConfig.type)?'text-fuchsia-600 bg-fuchsia-100':['alerta'].includes(modalConfig.type)?'text-amber-600 bg-amber-100':['preco','produtos','matriz','representatividade'].includes(modalConfig.type)?'text-blue-600 bg-blue-100':['abc'].includes(modalConfig.type)?'text-indigo-600 bg-indigo-100':'text-slate-600 bg-slate-100'}`}>
+                                                <Icon name={IconName} size={20}/>
+                                            </div>
+                                            <div>
+                                                <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter">{modalTitle}</h2>
+                                                <p className="text-[10px] font-bold text-slate-500">{modalDesc}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter">{modalTitle}</h2>
-                                            <p className="text-[10px] font-bold text-slate-500">{modalDesc}</p>
+                                        <div className="flex items-center gap-2 no-export flex-wrap">
+                                            {['distribuidores','produtos','top','abc'].includes(modalConfig.type) ? (
+                                                <div className="min-w-[200px]">
+                                                    <CustomSelect label={ modalConfig.type==='distribuidores'?'Distribuidor':modalConfig.type==='produtos'?'Produto':modalConfig.type==='abc'?(abcDimension==='clientes'?'Cliente':'Produto'):'Cliente' } options={ modalConfig.type==='distribuidores'?availableModalDistribuidores:modalConfig.type==='produtos'?availableModalProdutos:modalConfig.type==='abc'?abcOptions:availableModalClientes } selected={ modalConfig.type==='distribuidores'?modalDistributorFilter:modalConfig.type==='produtos'?modalProductFilter:modalConfig.type==='abc'?modalAbcFilter:modalClientFilter } onChange={v=>{ if(modalConfig.type==='distribuidores')setModalDistributorFilter(v); else if(modalConfig.type==='produtos')setModalProductFilter(v); else if(modalConfig.type==='top')setModalClientFilter(v); else if(modalConfig.type==='abc')setModalAbcFilter(v); }} placeholder="Pesquisar..." searchable={true} />
+                                                </div>
+                                            ) : modalConfig.type === 'representatividade' ? (
+                                                <div className="min-w-[200px]">
+                                                    <CustomSelect label={`Selecionar ${pieChartMetric}`} options={representatividadeDetails?.options || []} selected={modalRepFilter} onChange={(v)=>{setModalRepFilter(v); setSelectedOpportunity(null);}} placeholder="Pesquisar..." searchable={true} />
+                                                </div>
+                                            ) : null}
+                                            
+                                            {getModalBadge() && <div className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold">{String(getModalBadge())}</div>}
+
+                                            <button onClick={exportToPDF} className="px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-[10px] font-black border border-rose-100 flex items-center gap-1.5 hover:bg-rose-100 shadow-sm"><Icon name="Download" size={12}/> PDF</button>
+                                            
+                                            {modalConfig.type !== 'manual' && (
+                                                <button onClick={handleExportModalExcelData} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black border border-emerald-100 flex items-center gap-1.5 hover:bg-emerald-100 shadow-sm"><Icon name="FileSpreadsheet" size={12}/> Excel</button>
+                                            )}
+
+                                            <button onClick={()=>setModalConfig({isOpen:false, type:null})} className="w-9 h-9 bg-white border border-slate-200 rounded-xl flex items-center justify-center hover:text-rose-500 transition-all shadow-sm"><Icon name="X" size={16}/></button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 no-export flex-wrap">
-                                        {['distribuidores','produtos','top','abc'].includes(modalConfig.type) ? (
-                                            <div className="min-w-[200px]">
-                                                <CustomSelect label={ modalConfig.type==='distribuidores'?'Distribuidor':modalConfig.type==='produtos'?'Produto':modalConfig.type==='abc'?(abcDimension==='clientes'?'Cliente':'Produto'):'Cliente' } options={ modalConfig.type==='distribuidores'?availableModalDistribuidores:modalConfig.type==='produtos'?availableModalProdutos:modalConfig.type==='abc'?abcOptions:availableModalClientes } selected={ modalConfig.type==='distribuidores'?modalDistributorFilter:modalConfig.type==='produtos'?modalProductFilter:modalConfig.type==='abc'?modalAbcFilter:modalClientFilter } onChange={v=>{ if(modalConfig.type==='distribuidores')setModalDistributorFilter(v); else if(modalConfig.type==='produtos')setModalProductFilter(v); else if(modalConfig.type==='top')setModalClientFilter(v); else if(modalConfig.type==='abc')setModalAbcFilter(v); }} placeholder="Pesquisar..." searchable={true} />
+                                    
+                                    {modalConfig.type !== 'manual' && (
+                                        <div className={`flex flex-col gap-2 p-3 rounded-xl border ${isPdfMode ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 shadow-sm'} w-full`}>
+                                            <div className="flex items-start gap-1.5 text-[9px] w-full">
+                                                <span className={`font-black uppercase tracking-widest flex items-center gap-1 shrink-0 ${isPdfMode ? 'text-blue-800' : 'text-slate-500'}`}><Icon name="Filter" size={10} /> Filtros Globais Ativos:</span>
+                                                <span className={`font-bold leading-tight ${isPdfMode ? 'text-blue-900' : 'text-slate-700'}`}>{activeFiltersSummary}</span>
                                             </div>
-                                        ) : modalConfig.type === 'representatividade' ? (
-                                            <div className="min-w-[200px]">
-                                                <CustomSelect label={`Selecionar ${pieChartMetric}`} options={representatividadeDetails?.options || []} selected={modalRepFilter} onChange={(v)=>{setModalRepFilter(v); setSelectedOpportunity(null);}} placeholder="Pesquisar..." searchable={true} />
+                                            
+                                            {isPdfMode && (localModalSearch || modalUfFilter.length > 0 || modalYearFilter !== 'Todos') && (
+                                                <div className="flex items-start gap-1.5 text-[9px] w-full mt-1 pt-2 border-t border-blue-200/50">
+                                                    <span className="font-black text-indigo-800 uppercase tracking-widest flex items-center gap-1 shrink-0"><Icon name="Filter" size={10} /> Filtros Locais na Vista:</span>
+                                                    <span className="font-bold text-indigo-900 leading-tight">
+                                                        {[
+                                                            localModalSearch && `Busca: "${localModalSearch}"`,
+                                                            modalUfFilter.length > 0 && `UF: ${modalUfFilter.join(', ')}`,
+                                                            modalYearFilter !== 'Todos' && `Ano: ${modalYearFilter}`
+                                                        ].filter(Boolean).join('  •  ')}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            <div className="flex flex-wrap gap-3 items-end mt-1 no-export">
+                                                {['capilaridade','preco','analitico'].includes(modalConfig.type) && (
+                                                    <div className="flex flex-col gap-0.5 min-w-[100px]">
+                                                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Ano Local</label>
+                                                        <div className="relative">
+                                                            <select value={modalYearFilter} onChange={e=>setModalYearFilter(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 shadow-sm appearance-none h-[28px]">
+                                                                <option value="Todos">Todos</option>
+                                                                {allAvailableYears.map(y=><option key={String(y)} value={String(y)}>{y}</option>)}
+                                                            </select>
+                                                            <Icon name="ChevronDown" size={10} className="absolute right-2 top-2 text-slate-400 pointer-events-none"/>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {['capilaridade','preco','analitico','distribuidores','produtos','top','representatividade'].includes(modalConfig.type) && (
+                                                    <div className="flex flex-1 max-w-lg gap-3">
+                                                        <div className="flex-1 max-w-xs">
+                                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Busca Local</label>
+                                                            <DebouncedInput value={localModalSearch} onChange={setLocalModalSearch} placeholder="Filtrar nesta janela..." icon="Search"/>
+                                                        </div>
+                                                        <CustomMultiSelect label="Filtrar UF (Local)" options={availableOptions.states} selected={modalUfFilter} onChange={setModalUfFilter} placeholder="Todas UFs" searchable={true} />
+                                                    </div>
+                                                )}
                                             </div>
-                                        ) : null}
-                                        
-                                        {getModalBadge() && <div className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold">{String(getModalBadge())}</div>}
-
-                                        <button onClick={exportToPDF} className="px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-[10px] font-black border border-rose-100 flex items-center gap-1.5 hover:bg-rose-100 shadow-sm"><Icon name="Download" size={12}/> PDF</button>
-                                        
-                                        {modalConfig.type !== 'manual' && (
-                                            <button onClick={handleExportModalExcelData} className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black border border-emerald-100 flex items-center gap-1.5 hover:bg-emerald-100 shadow-sm"><Icon name="FileSpreadsheet" size={12}/> Excel</button>
-                                        )}
-
-                                        <button onClick={()=>setModalConfig({isOpen:false, type:null})} className="w-9 h-9 bg-white border border-slate-200 rounded-xl flex items-center justify-center hover:text-rose-500 transition-all shadow-sm"><Icon name="X" size={16}/></button>
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {!['abc','manual','matriz','representatividade'].includes(modalConfig.type) && (
-                                    <div className="p-3 bg-white border-b border-slate-50 flex gap-2 no-export items-end">
-                                        {['capilaridade','preco','analitico'].includes(modalConfig.type) && (
-                                            <div className="flex flex-col gap-0.5 min-w-[100px]">
-                                                <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Ano</label>
-                                                <div className="relative">
-                                                    <select value={modalYearFilter} onChange={e=>setModalYearFilter(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 shadow-sm appearance-none h-[28px]">
-                                                        <option value="Todos">Todos</option>
-                                                        {allAvailableYears.map(y=><option key={String(y)} value={String(y)}>{y}</option>)}
-                                                    </select>
-                                                    <Icon name="ChevronDown" size={10} className="absolute right-2 top-2 text-slate-400 pointer-events-none"/>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className="flex-1 max-w-xs">
-                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Busca Livre</label>
-                                            <DebouncedInput value={localModalSearch} onChange={setLocalModalSearch} placeholder="Filtrar nesta lista..." icon="Search"/>
-                                        </div>
-                                        <CustomMultiSelect label="Filtrar UF" options={availableOptions.states} selected={modalUfFilter} onChange={setModalUfFilter} placeholder="Todas UFs" searchable={true} />
-                                    </div>
-                                )}
-                                
-                                {modalConfig.type === 'representatividade' && (
-                                    <div className="p-3 bg-white border-b border-slate-50 flex gap-2 no-export items-end">
-                                        <div className="flex-1 max-w-xs">
-                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Busca Livre</label>
-                                            <DebouncedInput value={localModalSearch} onChange={setLocalModalSearch} placeholder="Filtrar clientes..." icon="Search"/>
-                                        </div>
-                                        <CustomMultiSelect label="Filtrar UF" options={availableOptions.states} selected={modalUfFilter} onChange={setModalUfFilter} placeholder="Todas UFs" searchable={true} />
-                                    </div>
-                                )}
-
-                                {(localModalSearch || modalUfFilter.length > 0) && !['abc','manual'].includes(modalConfig.type) && (
-                                    <div className="flex items-center gap-2 px-4 py-2 w-full border-b border-slate-100 bg-slate-50/50 no-export">
-                                        <span className="text-[8px] font-black text-slate-400 flex items-center gap-1"><Icon name="Filter" size={10} /> FILTROS ATIVOS:</span>
-                                        {localModalSearch && <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded text-[8px] font-bold shadow-sm">BUSCA: "{localModalSearch}"</span>}
-                                        {modalUfFilter.length > 0 && <span className="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded text-[8px] font-bold shadow-sm">UF: {modalUfFilter.join(', ')}</span>}
-                                    </div>
-                                )}
-
-                                <div className="p-0 overflow-y-auto modal-scroll flex-1 bg-slate-50/50 print-modal-bg print:overflow-visible print:bg-white">
+                                <div className="p-0 overflow-y-auto modal-scroll flex-1 bg-slate-50/50 print-modal-bg print:bg-white">
                                     {renderModalBody()}
                                 </div>
                             </div>
