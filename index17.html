@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Dashboard Comercial Avançado</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+<script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; } 
+.recharts-cartesian-grid-horizontal line { stroke: #f1f5f9; }
+.custom-scroll::-webkit-scrollbar { width: 4px; height: 4px; } .custom-scroll::-webkit-scrollbar-track { background: #f8fafc; } .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; }
+.modal-scroll::-webkit-scrollbar { width: 6px; height: 6px; } .modal-scroll::-webkit-scrollbar-track { background: #f1f5f9; } .modal-scroll::-webkit-scrollbar-thumb { background: #94a3b8; }
+@media print { @page { size: landscape; margin: 10mm; } body { background-color: #ffffff !important; } .no-print { display: none !important; } .print-force-bg { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } #main-dashboard-export-area { transform: scale(0.95); transform-origin: top left; width: 100%; gap: 10px; } .shadow-sm, .shadow-md, .shadow-xl { box-shadow: none !important; border: 1px solid #e2e8f0 !important; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef } = React;
+const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Treemap, Legend, ReferenceLine, ScatterChart, Scatter, ZAxis, ComposedChart } = window.Recharts;
+
+const USUARIOS = [{ nome: "Diretoria (Admin)", estados: "ALL", role: "admin", hash: "YWRtaW4uZGly" }];
+
+const SVG_PATHS = { 
+  TrendingUp: `<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>`, 
+  TrendingDown: `<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>`, 
+  Search: `<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>`, 
+  ChevronDown: `<polyline points="6 9 12 15 18 9"/>`, 
+  MapPin: `<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>`, 
+  Truck: `<rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle>`, 
+  Users: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>`, 
+  X: `<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`, 
+  Clock: `<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>`, 
+  Package: `<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>`, 
+  List: `<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>`, 
+  AlertCircle: `<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>`, 
+  UserPlus: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>`, 
+  UserMinus: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="22" y1="11" x2="16" y2="11"/>`, 
+  Bell: `<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>`, 
+  Loader2: `<path d="M21 12a9 9 0 1 1-6.219-8.56"/>`, 
+  Upload: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>`, 
+  Target: `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>`, 
+  Download: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`, 
+  BookOpen: `<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>`, 
+  FileSpreadsheet: `<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line>` 
+};
+
+const Icon = ({ name, size = 16, className = "" }) => SVG_PATHS[name] ? <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`inline-flex items-center justify-center ${name==='Loader2'?'animate-spin':''} ${className}`} width={size} height={size} dangerouslySetInnerHTML={{ __html: SVG_PATHS[name] }} /> : null;
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b', '#14b8a6'];
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const removeAccents = (str) => str ? String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+const formatCurrency = (val) => { const n=Number(val)||0; if(n>=1e9)return "R$ "+(n/1e9).toFixed(2).replace('.',',')+" Bi"; if(n>=1e6)return "R$ "+(n/1e6).toFixed(2).replace('.',',')+" Mi"; return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); };
+const formatShortNum = (val) => { const n=Number(val)||0; if(n>=1e9)return (n/1e9).toFixed(1).replace('.',',')+"Bi"; if(n>=1e6)return (n/1e6).toFixed(1).replace('.',',')+"M"; if(n>=1e3)return (n/1e3).toFixed(1).replace('.',',')+"k"; return n.toLocaleString('pt-BR'); };
+const formatCnpj = (cnpj) => { const s=String(cnpj||'').replace(/\D/g,''); return s.length===14?s.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,"$1.$2.$3/$4-$5"):String(cnpj||''); };
+const formatYAxisTick = (val) => String(val||'').length>15?String(val||'').substring(0,15)+'...':String(val||'');
+const getRankBadge = (r) => { if(!r)return null; const n=Number(r); if(n<=20)return <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[8px] font-black shrink-0">TOP 20 (#{n})</span>; if(n<=50)return <span className="bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded text-[8px] font-black shrink-0">TOP 50 (#{n})</span>; if(n<=100)return <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded text-[8px] font-black shrink-0">TOP 100 (#{n})</span>; return <span className="bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded text-[8px] font-black shrink-0">RANK #{n}</span>; };
+const exportToExcel = (dataToExport, title, showToastCallback) => { if(!dataToExport || dataToExport.length===0){if(showToastCallback)showToastCallback("Sem dados."); return;} const h=Object.keys(dataToExport[0]); const csvLines=[h.join(';')]; dataToExport.forEach(row=>{csvLines.push(h.map(k=>'"'+String(row[k]||'').replace(/"/g,'""')+'"').join(';'));}); const b=new Blob(['\uFEFF'+csvLines.join('\n')],{type:'text/csv;charset=utf-8;'}); const l=document.createElement('a'); l.href=URL.createObjectURL(b); l.download=title+".csv"; document.body.appendChild(l); l.click(); document.body.removeChild(l); if(showToastCallback)showToastCallback("Exportado com sucesso!"); };
+const renderClientCell = (r) => { const n=r.name||r._customer||r.Cliente||'N/I'; const c=formatCnpj(r.cnpj); const t=r.customerType||r._customerType||r.Tipo||'N/I'; return (<div><div className="font-bold text-slate-800 truncate max-w-[150px] md:max-w-[200px]" title={n}>{String(n)}</div><div className="text-[7px] text-slate-400 mt-0.5 flex items-center gap-1"><span>{c || 'Sem CNPJ'}</span><span className="text-slate-300">&bull;</span><span className="truncate max-w-[100px]">{t}</span></div></div>); };
+
+const parseNum = v => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'number') return v;
+    let s = String(v).trim(); if (!s || s === '-') return 0;
+    s = s.replace(/[^0-9.,-]/g, '');
+    const hasComma = s.includes(','); const hasDot = s.includes('.');
+    if (hasComma && hasDot) {
+        const commaIdx = s.lastIndexOf(','); const dotIdx = s.lastIndexOf('.');
+        if (commaIdx > dotIdx) { s = s.replace(/\./g, '').replace(',', '.'); } else { s = s.replace(/,/g, ''); }
+    } else if (hasComma) {
+        const parts = s.split(','); if (parts.length === 2 && parts[1].length <= 3) { s = s.replace(',', '.'); } else { s = s.replace(/,/g, ''); }
+    } else if (hasDot) {
+        const parts = s.split('.'); if (parts.length === 2 && parts[1].length <= 3) {} else { s = s.replace(/\./g, ''); }
+    }
+    return parseFloat(s) || 0;
+};
+
+const DebouncedInput = ({ value, onChange, placeholder, icon }) => { 
+  const [localVal, setLocalVal] = useState(value || ''); 
+  useEffect(() => { setLocalVal(value || ''); }, [value]); 
+  useEffect(() => { 
+    if (localVal === (value || '')) return;
+    const id = setTimeout(() => { onChange(localVal); }, 350); return () => clearTimeout(id); 
+  }, [localVal, value, onChange]); 
+  return (
+    <div className="relative flex items-center h-[26px]">
+      <Icon name={icon} className="absolute left-2 text-slate-400 pointer-events-none" size={10} />
+      <input type="text" placeholder={placeholder} value={localVal} onChange={e => setLocalVal(e.target.value)} className="w-full h-full pl-6 pr-6 bg-white border border-slate-200 rounded-md text-[9px] font-semibold focus:ring-1 focus:ring-blue-500 outline-none text-slate-700 shadow-sm" />
+      {localVal && <button onClick={() => { setLocalVal(''); onChange(''); }} className="absolute right-0 w-6 h-full flex items-center justify-center text-slate-400 hover:text-rose-500"><Icon name="X" size={10} /></button>}
+    </div>
+  ); 
+};
+
+const CustomSelect = ({ label, options = [], selected, onChange, placeholder, multi = false, searchable = false }) => {
+  const [isOpen, setIsOpen] = useState(false); const [term, setTerm] = useState(''); const ref = useRef(null);
+  useEffect(() => {
+    const clickOut = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
+    document.addEventListener('mousedown', clickOut); return () => document.removeEventListener('mousedown', clickOut);
+  }, []);
+  const filtered = searchable && term ? options.filter(o => removeAccents(String(o.label || '')).toLowerCase().includes(removeAccents(term.toLowerCase()))) : options;
+  const displayLabel = multi ? (selected.length === 0 ? placeholder : selected.length === options.length ? 'Todos' : selected.length + ' sel.') : (options.find(o => o.value === selected)?.label || placeholder);
+  return (
+    <div className="relative flex flex-col gap-0.5 min-w-[100px] flex-1" ref={ref}>
+      {label && <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">{label}</label>}
+      <div className="bg-white border border-slate-200 rounded-md px-2 py-1 text-[9px] font-bold text-slate-700 cursor-pointer flex justify-between items-center shadow-sm h-[26px] hover:bg-slate-50" onClick={() => setIsOpen(!isOpen)}>
+        <span className="truncate max-w-[150px]">{String(displayLabel)}</span>
+        <Icon name="ChevronDown" size={10} className="text-slate-400 ml-1 shrink-0" />
+      </div>
+      {isOpen && (
+        <div className="absolute top-[105%] left-0 w-full min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-56 flex flex-col overflow-hidden">
+          {searchable && (
+            <div className="p-1 border-b border-slate-100 bg-slate-50 flex items-center relative">
+              <Icon name="Search" size={10} className="text-slate-400 absolute left-2 pointer-events-none" />
+              <input type="text" placeholder="Buscar..." className="w-full pl-6 pr-5 py-1 text-[9px] font-semibold bg-white border border-slate-200 rounded outline-none" onChange={e => setTerm(e.target.value)} value={term} />
+            </div>
+          )}
+          <div className="overflow-y-auto custom-scroll p-1 flex flex-col gap-0.5 max-h-[160px]">
+            {multi && (
+              <label className="flex items-center gap-1.5 text-[9px] font-bold text-slate-800 cursor-pointer px-2 py-1 hover:bg-slate-100 rounded">
+                <input type="checkbox" checked={options.length > 0 && options.every(o => selected.includes(o.value))} onChange={() => {
+                  if (options.every(o => selected.includes(o.value))) onChange([]); else onChange(options.map(o => o.value));
+                }} className="w-2.5 h-2.5 accent-blue-600 rounded flex-shrink-0" />
+                <span>Selecionar Todos</span>
+              </label>
+            )}
+            {filtered.map(o => (
+              <label key={String(o.value)} onClick={() => { if (!multi) { onChange(o.value); setIsOpen(false); setTerm(''); } }} className={`flex items-center gap-1.5 text-[9px] font-semibold cursor-pointer px-2 py-1 rounded ${!multi && selected === o.value ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                {multi && <input type="checkbox" checked={selected.includes(o.value)} onChange={() => {
+                  if (selected.includes(o.value)) onChange(selected.filter(x => x !== o.value)); else onChange([...selected, o.value]);
+                }} className="w-2.5 h-2.5 accent-blue-600 rounded flex-shrink-0" />}
+                <span className="truncate">{String(o.label)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CustomMultiSelect = ({ label, options, selected = [], onChange, placeholder, searchable }) => <CustomSelect label={label} options={options} selected={selected} onChange={onChange} placeholder={placeholder} searchable={searchable} multi={true} />;
+
+const DataTable = ({ cols, data, footer, onRowClick, selectedRowValue, rowKey="name" }) => (
+  <div className="w-full overflow-x-auto custom-scroll">
+    <table className="w-full text-left border-collapse min-w-full">
+      <thead className="bg-slate-50 sticky top-0 shadow-sm z-10">
+        <tr className="text-[8px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
+          {cols.map((c, i) => (
+            <th key={i} onClick={c.sort} className={`px-2 py-1.5 ${c.align || 'text-left'} ${c.sort ? 'cursor-pointer hover:bg-slate-100' : ''}`}>
+              <div className={`flex items-center gap-1 ${c.align === 'text-right' ? 'justify-end' : c.align === 'text-center' ? 'justify-center' : ''} ${c.activeSort ? 'text-blue-600' : ''}`}>
+                {String(c.label)} {c.activeSort && <Icon name="ChevronDown" size={8} className={c.sortDir === 'asc' ? 'rotate-180' : ''} />}
+              </div>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="bg-white">
+        {data.map((r, i) => (
+          <tr key={i} onClick={() => onRowClick && onRowClick(r)} className={`border-b border-slate-50 text-[9px] ${onRowClick ? 'cursor-pointer' : ''} ${selectedRowValue && selectedRowValue === r[rowKey] ? 'bg-blue-50 border-l-2 border-blue-500' : 'hover:bg-slate-50 border-l-2 border-transparent'}`}>
+            {cols.map((c, j) => <td key={j} className={`px-2 py-1.5 ${c.align || 'text-left'}`}>{c.val(r, i)}</td>)}
+          </tr>
+        ))}
+        {data.length === 0 && <tr><td colSpan={cols.length} className="py-4 text-center text-[9px] text-slate-400 font-bold">Sem dados.</td></tr>}
+      </tbody>
+      {footer && <tfoot className="bg-slate-50 sticky bottom-0 shadow-inner">{footer}</tfoot>}
+    </table>
+  </div>
+);
+
+const renderBarLabel = (isFat, color) => (p) => {
+  if (!p.value) return null;
+  return <text x={(p.x||0)+(p.width||0)+4} y={(p.y||0)+(p.height||0)/2+1} fill={color} textAnchor="start" dominantBaseline="central" fontSize="8" fontWeight="bold">{isFat ? formatShortNum(p.value) : Number(p.value).toLocaleString('pt-BR')}</text>;
+};
+
+const MiniBarChart = ({ data, color, isFat, title }) => (
+  <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex flex-col h-full w-full relative">
+    <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-wider mb-1 shrink-0">{String(title)}</h4>
+    <div className="flex-1 w-full min-h-[100px] h-full absolute inset-0 pt-6 pb-2 px-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{left: 0, right: 30, top: 0, bottom: 0}}>
+          <XAxis type="number" hide />
+          <YAxis dataKey="name" type="category" width={90} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize:8,fontWeight:700,fill:'#64748b'}} interval={0} />
+          <Tooltip formatter={(v) => [isFat ? formatCurrency(v) : (Number(v).toLocaleString('pt-BR') + " un"), isFat ? 'Faturamento' : 'Quantidade']} cursor={{fill: '#f8fafc'}} contentStyle={{fontSize: '9px', fontWeight: 'bold'}} />
+          <Bar dataKey={isFat ? "valor" : "qty"} fill={color} radius={[0, 3, 3, 0]} barSize={10} label={renderBarLabel(isFat, color)} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+);
+
+const MiniLineChart = ({ data, isFat, setMode }) => (
+  <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex flex-col h-full w-full relative">
+    <div className="flex justify-between items-center mb-1 shrink-0 z-10 relative">
+      <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Evolução Mensal</h4>
+      <div className="flex bg-slate-100 p-0.5 rounded-md no-print">
+        <button onClick={() => setMode('faturamento')} className={`px-1.5 py-0.5 text-[7px] font-bold rounded transition-colors ${isFat ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>R$</button>
+        <button onClick={() => setMode('quantidade')} className={`px-1.5 py-0.5 text-[7px] font-bold rounded transition-colors ${!isFat ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}>Un.</button>
+      </div>
+    </div>
+    <div className="flex-1 w-full min-h-[100px] h-full absolute inset-0 pt-8 pb-2 px-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 5, right: 10, left: 15, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} />
+          <YAxis axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => formatShortNum(v)} width={35} />
+          <Tooltip formatter={(v) => [isFat ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), isFat ? "Faturamento" : "Qtd."]} contentStyle={{fontSize: '9px', fontWeight: 'bold'}} />
+          <Line type="monotone" dataKey={isFat ? 'valor' : 'qty'} name={isFat ? 'Faturamento' : 'Quantidade'} stroke="#3b82f6" strokeWidth={2.5} dot={{r: 2, fill: "#3b82f6", strokeWidth: 1.5, stroke: '#fff'}} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+);
+
+const CustomTreemapContentRecharts = (props) => {
+  const { x, y, width, height, index, name, value, root } = props; if (width < 30 || height < 30) return null;
+  const sName = String(name || ''); const pct = root && root.value ? ((value / root.value) * 100).toFixed(1) : 0;
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={CHART_COLORS[(index || 0) % CHART_COLORS.length]} stroke="#fff" strokeWidth={1} rx={3} ry={3} />
+      {width > 50 && height > 30 && sName && <text x={x + width / 2} y={y + height / 2 - 5} textAnchor="middle" fill="#ffffff" stroke="#000000" strokeWidth={3} paintOrder="stroke" fontSize={9} fontWeight="900" dominantBaseline="central">{sName.length > 15 ? sName.substring(0, 15) + '...' : sName}</text>}
+      {width > 50 && height > 30 && <text x={x + width / 2} y={y + height / 2 + 5} textAnchor="middle" fill="#ffffff" stroke="#000000" strokeWidth={2} paintOrder="stroke" fontSize={8} fontWeight="700" dominantBaseline="central">{formatShortNum(value)} ({pct}%)</text>}
+    </g>
+  );
+};
+
+const TooltipBox = ({ title, children }) => {
+  const s = typeof title === 'object' && title !== null ? String(title.value || title.name || '') : String(title || '');
+  return (<div className="bg-slate-900 p-2 rounded-xl shadow-2xl border border-slate-700 text-[9px] z-50 text-white min-w-[150px]">{s && <p className="font-black text-blue-300 mb-1 border-b border-slate-700 pb-1 truncate">{s}</p>}<div className="flex flex-col gap-0.5">{children}</div></div>);
+};
+
+const CustomYoyTooltip = ({ active, payload, label, yearComparison, isProduct }) => {
+  if (!active || !payload?.length || !yearComparison) return null;
+  const d = payload[0].payload || payload[0]; const cV = d.curVal || 0; const pV = d.compVal || 0; const cQ = d.qtyCur || 0; const pQ = d.qtyComp || 0;
+  const mC = isProduct ? cQ : cV; const mP = isProduct ? pQ : pV; const g = mP > 0 ? ((mC - mP) / mP) * 100 : null;
+  return (
+    <TooltipBox title={label}>
+      <div className="flex justify-between items-center gap-2"><span className="text-[8px] text-slate-400">{String(yearComparison.curLabel)}</span><strong className="text-[10px]">{isProduct ? (cQ.toLocaleString('pt-BR') + " un") : formatCurrency(cV)}</strong></div>
+      {payload.length > 1 && <div className="flex justify-between items-center gap-2"><span className="text-[8px] text-slate-500">{String(yearComparison.prevLabel)}</span><strong className="text-[9px] text-slate-300">{isProduct ? (pQ.toLocaleString('pt-BR') + " un") : formatCurrency(pV)}</strong></div>}
+      {g !== null && <div className={`mt-1 pt-1 border-t border-slate-700 font-black flex items-center gap-1 ${g >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}><Icon name={g >= 0 ? 'TrendingUp' : 'TrendingDown'} size={10} />{g >= 0 ? '+' : ''}{g.toFixed(1)}%</div>}
+    </TooltipBox>
+  );
+};
+
+const CustomUFTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null; const d = payload[0].payload || payload[0];
+  return (
+    <TooltipBox title={null}>
+      <div className="flex items-center gap-1 mb-1 border-b border-slate-700 pb-1"><div className="w-2 h-2 rounded-full" style={{backgroundColor: payload[0].fill}}></div><p className="font-black truncate text-white">{String(d.name || '')}</p></div>
+      <div className="flex justify-between items-center gap-2"><span className="text-[8px] text-slate-400">Atual:</span><strong className="text-[10px] text-emerald-400">{formatCurrency(d.curVal)}</strong></div>
+      <div className="flex justify-between items-center gap-2"><span className="text-[8px] text-slate-400">Anterior:</span><strong className="text-[9px] text-slate-300">{formatCurrency(d.compVal)}</strong></div>
+      {d.growth !== null && <div className={`mt-1 pt-1 border-t border-slate-700 text-[9px] font-black flex items-center gap-1 ${d.growth >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}><Icon name={d.growth >= 0 ? 'TrendingUp' : 'TrendingDown'} size={10} />{d.growth >= 0 ? '+' : ''}{Number(d.growth).toFixed(1)}%</div>}
+    </TooltipBox>
+  );
+};
+
+const CustomAbcTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null; const d = payload[0].payload || payload[0];
+  return (
+    <TooltipBox title={d.name}>
+      <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[8px] text-slate-400">Rank:</span><span className="text-[10px] font-black text-white">#{String(d.rank)}</span></div>
+      <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[8px] text-slate-400">Fat:</span><span className="text-[9px] font-bold text-emerald-400">{formatCurrency(d.amount)}</span></div>
+      <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[8px] text-slate-400">Repres:</span><span className="text-[9px] font-bold text-slate-300">{Number(d.pct || 0).toFixed(2)}%</span></div>
+      <div className="flex justify-between items-center gap-2 mb-1"><span className="text-[8px] text-slate-400">Acumulado:</span><span className="text-[9px] font-bold text-fuchsia-400">{Number(d.accPct || 0).toFixed(2)}%</span></div>
+      <div className="pt-1 border-t border-slate-700 flex justify-between items-center"><span className="text-[8px] text-slate-400">Classe:</span><span className={`px-1 py-0.5 rounded text-[8px] font-black ${d.curve==='A'?'bg-emerald-500/20 text-emerald-400':(d.curve==='B'?'bg-blue-500/20 text-blue-400':'bg-slate-500/20 text-slate-300')}`}>CURVA {String(d.curve)}</span></div>
+    </TooltipBox>
+  );
+};
+
+const CustomScatterTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null; const d = payload[0].payload || payload[0];
+  return (
+    <TooltipBox title={d.name}>
+      <div className="flex justify-between items-center gap-2 mb-0.5"><span className="text-[8px] text-slate-400">Faturamento:</span><span className="text-[10px] font-black text-emerald-400">{formatCurrency(d.fatCur)}</span></div>
+      <div className="flex justify-between items-center gap-2"><span className="text-[8px] text-slate-400">Crescimento:</span><span className={`text-[9px] font-black flex items-center gap-1 ${d.growth>=0?'text-emerald-400':'text-rose-400'}`}><Icon name={d.growth>=0?'TrendingUp':'TrendingDown'} size={8}/>{d.growth>0?'+':''}{Number(d.growth||0).toFixed(1)}%</span></div>
+    </TooltipBox>
+  );
+};
+
+const GrowthBadge = ({ growth, curLabel, prevLabel, timeMode = 'YTD' }) => {
+  if (growth === null || growth === undefined) return <div className="mt-0.5 flex items-center gap-1 text-[8px] font-bold text-slate-400 w-fit">Sem histórico ({String(timeMode)})</div>;
+  const isPos = growth > 0; const isNeu = growth === 0; let cC = "text-slate-500"; let iN = "TrendingUp"; if (isPos) { cC = "text-emerald-600"; iN = "TrendingUp"; } else if (!isNeu) { cC = "text-rose-600"; iN = "TrendingDown"; }
+  return (<div className={`mt-0.5 flex items-center gap-0.5 text-[9px] font-black w-fit cursor-help ${cC}`} title={"Comparação: " + String(curLabel) + " vs " + String(prevLabel)}><Icon name={iN} size={10} /> {isPos ? '+' : ''}{Number(growth || 0).toFixed(1)}% <span className="font-semibold text-[7px] text-slate-400 ml-0.5">vs Ant.</span></div>);
+};
+
+const KPICard = ({ title, metricKey, growthKey, icon, color, met, yearComp, timeMode, isCurrency=false, isNumber=false, onClick=null, toggle=null }) => {
+  const styles = {
+    slate: { bg: 'bg-white hover:bg-slate-50 border-slate-200', text: 'text-slate-500', title: 'text-slate-800', badge: 'bg-slate-50 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 border-slate-200', icon: 'text-slate-400 group-hover:text-blue-600', val: 'text-slate-800', toggle: 'bg-slate-200/60 text-slate-700 hover:bg-slate-600 hover:text-white', titleBorder: 'border-slate-400' },
+    blue: { bg: 'bg-blue-50 hover:bg-blue-100 border-blue-200', text: 'text-blue-600/80', title: 'text-blue-700', badge: 'bg-white text-blue-500 group-hover:bg-blue-600 group-hover:text-white border-blue-200', icon: 'text-blue-400 group-hover:text-blue-600', val: 'text-blue-700', toggle: 'bg-blue-200/60 text-blue-700 hover:bg-blue-600 hover:text-white', titleBorder: 'border-blue-400' },
+    emerald: { bg: 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200', text: 'text-emerald-600/80', title: 'text-emerald-700', badge: 'bg-white text-emerald-500 group-hover:bg-emerald-600 group-hover:text-white border-emerald-200', icon: 'text-emerald-400 group-hover:text-emerald-600', val: 'text-emerald-700', toggle: 'bg-blue-200/60 text-blue-700 hover:bg-blue-600 hover:text-white', titleBorder: 'border-emerald-400' },
+    amber: { bg: 'bg-amber-50 hover:bg-amber-100 border-amber-200', text: 'text-amber-600/80', title: 'text-amber-700', badge: 'bg-white text-amber-500 group-hover:bg-amber-600 group-hover:text-white border-amber-200', icon: 'text-amber-400 group-hover:text-amber-600', val: 'text-amber-700', toggle: 'bg-blue-200/60 text-blue-700 hover:bg-blue-600 hover:text-white', titleBorder: 'border-amber-400' },
+    rose: { bg: 'bg-rose-50 hover:bg-rose-100 border-rose-200', text: 'text-rose-600/80', title: 'text-rose-700', badge: 'bg-white text-rose-500 group-hover:bg-rose-600 group-hover:text-white border-rose-200', icon: 'text-rose-400 group-hover:text-rose-600', val: 'text-rose-700', toggle: 'bg-blue-200/60 text-blue-700 hover:bg-blue-600 hover:text-white', titleBorder: 'border-rose-400' }
+  };
+  const c = styles[color] || styles.slate;
+  return (
+    <div onClick={onClick} className={`${c.bg} p-2 lg:p-3 rounded-xl border shadow-sm flex flex-col justify-between ${onClick?'cursor-pointer group transition-all':''}`}>
+      <div>
+        <div className="flex justify-between items-start mb-1">
+          <div className="flex items-center gap-1">
+            <p className={`${c.text} text-[8px] font-black uppercase tracking-wider ${onClick?'cursor-help border-b border-dashed '+c.titleBorder:''} w-fit`}>{String(title)}</p>
+            {toggle && <button data-html2canvas-ignore="true" onClick={(e)=>{e.stopPropagation(); toggle();}} className={`text-[7px] font-black uppercase tracking-widest px-1 py-0.5 rounded transition-colors no-print ${c.toggle}`}>Alt.</button>}
+          </div>
+          <Icon name={icon} size={12} className={`${c.icon} transition-colors`} />
+        </div>
+        <h3 className={`text-sm lg:text-lg font-black ${c.title}`}>{isCurrency?formatCurrency(met[metricKey]):isNumber?(Number(met[metricKey])||0).toLocaleString('pt-BR'):formatCurrency(met[metricKey]||0)}</h3>
+      </div>
+      {growthKey ? (
+        <div className="flex flex-col gap-0.5 mt-auto">
+          <GrowthBadge growth={met[growthKey]} curLabel={yearComp?.curLabel} prevLabel={yearComp?.prevLabel} timeMode={timeMode} />
+          {onClick && <div data-html2canvas-ignore="true" className={`no-print mt-1.5 flex items-center gap-1 text-[8px] font-bold w-fit px-1.5 py-0.5 rounded border transition-colors shadow-sm ${c.badge}`}>{title==='Preço Médio'?'Ver Tabela':'Ver Lista'}</div>}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-0.5 mt-auto">
+          {onClick && <div data-html2canvas-ignore="true" className={`no-print mt-1.5 flex items-center gap-1 text-[8px] font-bold w-fit px-1.5 py-0.5 rounded border transition-colors shadow-sm ${c.badge}`}>Detalhar</div>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RankWidget = ({ title, icon, colorClass, fillHex, data, isFat, onOpenModal, timeMode, yearComparison }) => (
+  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col group h-full print-force-bg">
+    <div className="flex justify-between items-center mb-2">
+      <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5"><Icon name={icon} size={12} className={colorClass} /> {String(title)} <span className="text-[7px] text-slate-400 bg-slate-100 px-1 py-0.5 rounded ml-0.5">{String(timeMode)}</span></h3>
+      <button data-html2canvas-ignore="true" onClick={onOpenModal} className={`no-print text-[8px] font-bold ${colorClass} bg-slate-50 px-2 py-1 rounded-md border border-slate-200 flex items-center gap-1 hover:bg-slate-100 transition-colors shadow-sm`}><Icon name="List" size={10} /> Expandir</button>
+    </div>
+    <div className="h-[180px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+          <XAxis type="number" hide={true} />
+          <YAxis dataKey="name" type="category" width={90} axisLine={false} tickLine={false} tickFormatter={formatYAxisTick} tick={{fontSize: 8, fontWeight: 700, fill: '#64748b'}} interval={0} />
+          <Tooltip content={(props) => <CustomYoyTooltip {...props} yearComparison={yearComparison} isProduct={!isFat} />} cursor={{fill: '#f8fafc'}} />
+          <Legend verticalAlign="top" height={16} iconType="circle" wrapperStyle={{ fontSize: '8px', fontWeight: 'bold', color: '#64748b' }} />
+          <Bar dataKey={isFat?'curVal':'qtyCur'} name="Atual" fill={fillHex} radius={[0, 2, 2, 0]} barSize={5} label={renderBarLabel(isFat, fillHex)} />
+          <Bar dataKey={isFat?'compVal':'qtyComp'} name="Anterior" fill="#cbd5e1" radius={[0, 2, 2, 0]} barSize={5} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+);
+
+const InsightsBar = ({ metrics }) => {
+  if (!metrics || metrics.fatCur === 0) return null; const g = metrics.fatGrowth;
+  const insight1 = g >= 0 ? { text: `Ritmo excelente! O faturamento está crescendo ${g.toFixed(1)}% frente ao período anterior.`, color: 'text-emerald-300', bg: 'bg-emerald-900/50' } : { text: `Atenção: O faturamento apresenta uma queda de ${Math.abs(g).toFixed(1)}% frente ao período anterior.`, color: 'text-rose-300', bg: 'bg-rose-900/50' };
+  const riskVal = metrics.alertaDetails.reduce((a, b) => a + (b.mediaMensal * b.atraso), 0);
+  const insight2 = metrics.alertaMain > 0 ? { text: `Existem ${metrics.alertaMain} clientes na zona de Alerta, ameaçando ${formatCurrency(riskVal)} de receita.`, color: 'text-amber-300', bg: 'bg-amber-900/50' } : { text: `Carteira saudável! Sem volume crítico na zona de alerta no momento.`, color: 'text-blue-300', bg: 'bg-blue-900/50' };
+  const topPerdido = metrics.perdidosDetails.length > 0 ? metrics.perdidosDetails[0] : null;
+  const insight3 = topPerdido ? { text: `Fuga de carteira: O cliente ${topPerdido.name.substring(0, 20)} parou de comprar (-${formatCurrency(topPerdido.fatComp)}).`, color: 'text-rose-300', bg: 'bg-rose-900/50' } : { text: `Retenção forte! Nenhum cliente principal perdido no recorte atual.`, color: 'text-emerald-300', bg: 'bg-emerald-900/50' };
+  return (
+    <div className="bg-slate-900 rounded-xl p-2 flex flex-col lg:flex-row gap-2 items-stretch lg:items-center shadow-md border border-slate-800 mt-1 mb-2 print-force-bg">
+      <div className="flex items-center gap-2 px-2 lg:border-r border-slate-700 shrink-0">
+        <Icon name="Target" size={16} className="text-blue-400" />
+        <div><h4 className="text-white text-[9px] font-black uppercase tracking-widest leading-none">Insights</h4><span className="text-slate-400 text-[7px]">Leitura Inteligente</span></div>
+      </div>
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className={`px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-[9px] font-bold ${insight1.bg} ${insight1.color}`}><Icon name={g >= 0 ? "TrendingUp" : "TrendingDown"} size={12} /> <span className="truncate" title={insight1.text}>{insight1.text}</span></div>
+        <div className={`px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-[9px] font-bold ${insight2.bg} ${insight2.color}`}><Icon name="Bell" size={12} /> <span className="truncate" title={insight2.text}>{insight2.text}</span></div>
+        <div className={`px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-[9px] font-bold ${insight3.bg} ${insight3.color}`}><Icon name={topPerdido ? "UserMinus" : "UserPlus"} size={12} /> <span className="truncate" title={insight3.text}>{insight3.text}</span></div>
+      </div>
+    </div>
+  );
+};
+
+const DashboardApp = () => {
+    const currentYearStr = String(new Date().getFullYear());
+    const [data, setData] = useState([]); const [isLoaded, setIsLoaded] = useState(false); const [lastUpdate, setLastUpdate] = useState(null); const [errorMsg, setErrorMsg] = useState(null); const [isLoadingAuto, setIsLoadingAuto] = useState(false); const [toastMessage, setToastMessage] = useState(null); const [isAdminVerified, setIsAdminVerified] = useState(false); const [showUploadScreen, setShowUploadScreen] = useState(false); const [passwordValue, setPasswordValue] = useState(''); const [passwordError, setPasswordError] = useState(false); const [currentUser, setCurrentUser] = useState(null); const [timeMode, setTimeMode] = useState('YTD'); const [evolucaoMode, setEvolucaoMode] = useState('faturamento'); const [modalEvolucaoMode, setModalEvolucaoMode] = useState('faturamento'); const [pieChartMetric, setPieChartMetric] = useState('Distribuidor'); const [priceKpiMode, setPriceKpiMode] = useState('preco'); const [scatterMetric, setScatterMetric] = useState('clientes'); const [filters, setFilters] = useState({ searchCustomer: '', searchProduct: '', years: [currentYearStr], months: [], state: [], city: [], distributor: [], customerType: [], type: [], product: [] }); const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null }); const [localModalSearch, setLocalModalSearch] = useState(''); const [modalDistributorFilter, setModalDistributorFilter] = useState('TODOS'); const [modalProductFilter, setModalProductFilter] = useState('TODOS'); const [modalClientFilter, setModalClientFilter] = useState('TODOS'); const [modalRepFilter, setModalRepFilter] = useState('TODOS'); const [selectedOpportunity, setSelectedOpportunity] = useState(null); const [analiticoSortConfig, setAnaliticoSortConfig] = useState({ column: 'data', direction: 'desc' }); const [clientSortConfig, setClientSortConfig] = useState({ column: 'fatCur', direction: 'desc' }); const [matrizSortConfig, setMatrizSortConfig] = useState({ column: 'fatCur', direction: 'desc' }); const [abcDimension, setAbcDimension] = useState('clientes');
+
+    const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 3000); };
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0]; if (!file) return; setIsLoadingAuto(true); setErrorMsg(null); setShowUploadScreen(false); const reader = new FileReader();
+        reader.onload = (ev) => { setTimeout(() => { try { const text = ev.target.result; if (!text || text.trim().length === 0) throw new Error("O ficheiro CSV parece estar vazio."); const firstLine = text.split(/\r?\n/)[0] || ''; const commaCount = (firstLine.match(/,/g) || []).length; const semiCount = (firstLine.match(/;/g) || []).length; Papa.parse(text, { header: true, delimiter: semiCount > commaCount ? ';' : ',', skipEmptyLines: 'greedy', complete: (results) => { try { const raw = results.data; if (!raw || raw.length === 0) throw new Error("Não foi possível ler as linhas."); const origH = results.meta.fields || []; const cHead = origH.map(h => removeAccents(String(h || '').trim().toLowerCase()).replace(/[^a-z0-9]/g, '')); const aliases = { a:['amount','faturamento','total','valor','venda','vendas','receita','fat','vlr','bruto','liquido','valortotal','receitabruta','vlrliquido'], q:['qty','quantidade','volume','qtd','qtde','pecas','unid','unidades','peso','qnt','qntd','quant'], ct:['tipocliente','canal','segmento','tipodecliente','customertype','ramo','classificacao','grupoparceiro'], c:['cliente','nomefantasia','razaosocial','parceiro','customer','pdv','loja','nome','comprador','destinatario'], d:['distribuidor','revenda','distributor','fornecedor','rede','representante','vendedor','equipe'], p:['produto','material','descricao','product','item','standard','desc','sku','codigo','codigoproduto','nomeproduto'], s:['uf','estado','state','ufcliente','regiao'], ci:['cidade','municipio','city','local','cidadecliente'], t:['unidade','filial','type','empresa'], y:['ano','year','exercicio'], m:['mes','month','periodo'], dt:['data','emissao','date','dtemissao','criacao','lancamento','mouse','movimento','documento','dataemissao','datavenda','mesano'], cj:['cnpj','cgc','documento','cpf','doc','id','cgccpf'] }; const fK = (aA) => { const idx = cHead.findIndex(k => aA.some(a => k === a || k.includes(a) || k.replace(/[^a-z0-9]/g, '') === a)); return idx !== -1 ? origH[idx] : null; }; const keys = { a:fK(aliases.a), q:fK(aliases.q), ct:fK(aliases.ct), c:fK(aliases.c), d:fK(aliases.d), p:fK(aliases.p), s:fK(aliases.s), ci:fK(aliases.ci), t:fK(aliases.t), y:fK(aliases.y), m:fK(aliases.m), dt:fK(aliases.dt), cj:fK(aliases.cj) }; if (!keys.a && !keys.q) throw new Error("Não encontrei as colunas de Valor e Quantidade.");
+        
+        const yearFormats = {};
+        raw.forEach(r => {
+            if (!r) return; const rDt = keys.dt ? String(r[keys.dt] || '').trim().split(' ')[0] : '';
+            if (rDt && rDt.includes('/')) {
+                const pt = rDt.split('/');
+                if (pt.length >= 3) {
+                    let y = parseInt(pt[2], 10); if (y > 0 && y < 100) y += 2000;
+                    if (y > 0) {
+                        if (!yearFormats[y]) yearFormats[y] = 'BR';
+                        const p0 = parseInt(pt[0], 10) || 0; const p1 = parseInt(pt[1], 10) || 0;
+                        if (p0 > 12) { yearFormats[y] = 'BR'; } else if (p1 > 12) { yearFormats[y] = 'US'; }
+                    }
+                }
+            }
+        });
+
+        let maxDateTs = 0; let maxYearFound = 0; const resData = []; let mDateR = 0; 
+        for (let i = 0; i < raw.length; i++) { const r = raw[i]; if (!r) continue; const o = {}; o._amount = keys.a ? parseNum(r[keys.a]) : 0; o._qty = keys.q ? parseNum(r[keys.q]) : 0;
+        
+        if (o._amount > 2000000 || o._qty > 100000) continue;
+        if (o._amount === 0 && o._qty === 0) continue; 
+        
+        o._customerType = keys.ct && r[keys.ct] ? String(r[keys.ct]).trim() : 'N/I'; o._customer = keys.c && r[keys.c] ? String(r[keys.c]).trim() : 'Não Informado'; o._distributor = keys.d && r[keys.d] ? String(r[keys.d]).trim() : 'Não Informado'; o._product = keys.p && r[keys.p] ? String(r[keys.p]).trim() : 'Não Informado'; o._state = keys.s && r[keys.s] ? String(r[keys.s]).trim().toUpperCase() : 'N/I'; o._city = keys.ci && r[keys.ci] ? String(r[keys.ci]).trim().toUpperCase() : 'N/I'; o._type = keys.t && r[keys.t] ? String(r[keys.t]).trim() : 'N/I'; o.cnpj = keys.cj && r[keys.cj] ? String(r[keys.cj]).replace(/\D/g, '') : '';
+        
+        let y = 0; let m = 0; let dD = 1; let rDt = keys.dt && r[keys.dt] ? String(r[keys.dt]).trim().split(' ')[0] : ''; let ts = 0; let dDt = ''; 
+        if (rDt) { 
+            if (rDt.includes('/')) { 
+                const pt = rDt.split('/'); 
+                if (pt.length >= 3) {
+                    let tempY = parseInt(pt[2], 10) || 2024; if (tempY > 0 && tempY < 100) tempY += 2000;
+                    const format = yearFormats[tempY] || 'BR';
+                    if (format === 'BR') { dD = parseInt(pt[0], 10) || 1; m = parseInt(pt[1], 10) || 1; y = tempY; } else { dD = parseInt(pt[1], 10) || 1; m = parseInt(pt[0], 10) || 1; y = tempY; }
+                }
+            } else if (rDt.includes('-')) { 
+                const pt = rDt.split('-'); 
+                if (pt[0].length === 4) { y = parseInt(pt[0], 10) || 2024; m = parseInt(pt[1], 10) || 1; dD = parseInt(pt[2], 10) || 1; } else { dD = parseInt(pt[0], 10) || 1; m = parseInt(pt[1], 10) || 1; y = parseInt(pt[2], 10) || 2024; } 
+            } 
+        }
+        if (y === 0) { y = keys.y && r[keys.y] ? parseInt(String(r[keys.y]).replace(/\D/g, ''), 10) : 0; m = keys.m && r[keys.m] ? parseInt(String(r[keys.m]).replace(/\D/g, ''), 10) : 0; } else { let explicitM = keys.m && r[keys.m] ? parseInt(String(r[keys.m]).replace(/\D/g, ''), 10) : 0; if (explicitM >= 1 && explicitM <= 12) m = explicitM; }
+        if (y > 0 && y < 100) y += 2000; if (y > 0 && m > 0) { ts = new Date(y, m - 1, dD, 12, 0, 0).getTime(); dDt = String(dD).padStart(2, '0') + "/" + String(m).padStart(2, '0') + "/" + String(y); } else { const nw = new Date(); y = nw.getFullYear(); m = nw.getMonth() + 1; dD = nw.getDate(); ts = new Date(y, m - 1, dD, 12, 0, 0).getTime(); dDt = String(dD).padStart(2, '0') + "/" + String(m).padStart(2, '0') + "/" + String(y); mDateR++; } o._year = Number(y) || 0; o._month = Number(m) || 0; o._timestamp = ts; o._displayDate = dDt || 'N/I'; if (y > maxYearFound) maxYearFound = y; o._customerNorm = removeAccents(o._customer).toLowerCase(); o._productNorm = removeAccents(o._product).toLowerCase(); o._cityNorm = removeAccents(o._city).toLowerCase(); o._distributorNorm = removeAccents(o._distributor).toLowerCase(); resData.push(o); if (ts && ts > maxDateTs) maxDateTs = ts; } if (resData.length === 0) throw new Error("A base foi lida, mas os dados estão zerados."); setData(resData); setIsLoaded(true); setFilters(prev => ({...prev, years: [String(maxYearFound || currentYearStr)], customerType: []})); let wT = ""; if (mDateR > 0) wT = " | Aviso: " + mDateR + " vendas s/ data alocadas no mês atual."; if (maxDateTs > 0) { const d = new Date(maxDateTs); setLastUpdate(String(d.getDate()).padStart(2, '0') + "/" + String(d.getMonth() + 1).padStart(2, '0') + "/" + d.getFullYear() + wT); } else setLastUpdate("Sincronizado" + wT); } catch (err) { setErrorMsg("Erro ao processar: " + err.message); setShowUploadScreen(true); } finally { setIsLoadingAuto(false); } }}); } catch (outErr) { setErrorMsg("Erro geral: " + outErr.message); setIsLoadingAuto(false); setShowUploadScreen(true); } }, 50); }; reader.onerror = () => { setErrorMsg("Erro na leitura local."); setIsLoadingAuto(false); setShowUploadScreen(true); }; reader.readAsText(file); if (e.target) e.target.value = null;
+    };
+
+    const handleExportPDF = () => {
+        if (typeof window.html2canvas === 'undefined' || typeof window.jspdf === 'undefined') { showToast("Bibliotecas de PDF ainda a carregar..."); return; }
+        setIsLoadingAuto(true); showToast("Gerando PDF... Aguarde.");
+        
+        setTimeout(() => {
+            const el = document.getElementById('main-dashboard-export-area'); 
+            if (!el) { setIsLoadingAuto(false); return; }
+            
+            // Backup do overflow para html2canvas não cortar imagens grandes
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'visible';
+            window.scrollTo(0, 0); // Evita bugs de recorte de tela
+            
+            const noPrintElements = document.querySelectorAll('.no-print'); 
+            noPrintElements.forEach(e => e.style.display = 'none');
+            const yy = document.getElementById('youyou-img'); 
+            if(yy) yy.style.display = 'none'; 
+
+            window.html2canvas(el, { scale: 1.5, useCORS: true, logging: false, backgroundColor: '#f1f5f9' })
+            .then((canvas) => {
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('l', 'mm', 'a4'); 
+                const pdfW = pdf.internal.pageSize.getWidth(); const pdfH = pdf.internal.pageSize.getHeight();
+                const imgRatio = canvas.width / canvas.height; const pdfRatio = pdfW / pdfH;
+                let finalW, finalH; if (imgRatio > pdfRatio) { finalW = pdfW; finalH = pdfW / imgRatio; } else { finalH = pdfH; finalW = pdfH * imgRatio; }
+                const x = (pdfW - finalW) / 2; const y = (pdfH - finalH) / 2;
+                pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
+                pdf.save(`Performance_Comercial_${timeMode}.pdf`);
+                showToast("PDF gerado com sucesso!");
+            })
+            .catch(err => {
+                console.error(err);
+                showToast("Erro ao gerar PDF.");
+            })
+            .finally(() => {
+                noPrintElements.forEach(e => e.style.display = ''); 
+                if(yy) yy.style.display = '';
+                document.body.style.overflow = originalOverflow;
+                setIsLoadingAuto(false); 
+            });
+        }, 300);
+    };
+
+    const verifyPassword = () => { if (!passwordValue) return; const hashInput = btoa(passwordValue.trim().toLowerCase()); const userMatch = USUARIOS.find(u => u.hash === hashInput); if (userMatch) { setCurrentUser(userMatch); setIsAdminVerified(true); setShowUploadScreen(true); setPasswordValue(''); setPasswordError(false); } else setPasswordError(true); };
+    const openModal = (type) => { setModalConfig({ isOpen: true, type }); setLocalModalSearch(''); if (type === 'representatividade') setModalRepFilter('TODOS'); if (type === 'analitico') setAnaliticoSortConfig({ column: 'data', direction: 'desc' }); if (type === 'matriz') setMatrizSortConfig({ column: 'fatCur', direction: 'desc' }); };
+
+    const availableOptions = useMemo(() => {
+        if (!data.length) return { years: [], months: [], states: [], cities: [], distributors: [], customerTypes: [], types: [], products: [] };
+        const y=new Set(); const s=new Set(); const c=new Set(); const d=new Set(); const ct=new Set(); const t=new Set(); const p=new Set();
+        data.forEach(x => { if(x._year)y.add(x._year); if(x._state)s.add(x._state); if(x._city)c.add(x._city); if(x._distributor)d.add(x._distributor); if(x._customerType)ct.add(x._customerType); if(x._type)t.add(x._type); if(x._product)p.add(x._product); });
+        return { years:[...y].sort((a,b)=>b-a).map(v=>({label:String(v),value:String(v)})), months:MONTH_NAMES.map((v,i)=>({label:v,value:String(i+1)})), states:[...s].sort().map(v=>({label:String(v),value:String(v)})), cities:[...c].sort().map(v=>({label:String(v),value:String(v)})), distributors:[...d].sort().map(v=>({label:String(v),value:String(v)})), customerTypes:[...ct].sort().map(v=>({label:String(v),value:String(v)})), types:[...t].sort().map(v=>({label:String(v),value:String(v)})), products:[...p].sort().map(v=>({label:String(v),value:String(v)})) };
+    }, [data]);
+
+    const filteredDataGlobal = useMemo(() => {
+        if (!data.length) return []; const sCTerm = filters.searchCustomer ? removeAccents(filters.searchCustomer).toLowerCase().trim() : ''; const sCDigits = sCTerm.replace(/\D/g, ''); const sPTerm = filters.searchProduct ? removeAccents(filters.searchProduct).toLowerCase().trim() : '';
+        return data.filter(x => { if (filters.years.length > 0 && !filters.years.includes(String(x._year))) return false; if (filters.months.length > 0 && !filters.months.includes(String(x._month))) return false; if (filters.state.length > 0 && !filters.state.includes(x._state)) return false; if (filters.city.length > 0 && !filters.city.includes(x._city)) return false; if (filters.distributor.length > 0 && !filters.distributor.includes(x._distributor)) return false; if (filters.type.length > 0 && !filters.type.includes(x._type)) return false; if (filters.customerType.length > 0 && !filters.customerType.includes(x._customerType)) return false; if (filters.product.length > 0 && !filters.product.includes(x._product)) return false; if (sCTerm && !(String(x._customerNorm || '').includes(sCTerm) || (sCDigits && String(x.cnpj || '').includes(sCDigits)))) return false; if (sPTerm && !String(x._productNorm || '').includes(sPTerm)) return false; return true; });
+    }, [data, filters]);
+
+    const handleExportMainExcel = () => {
+        if (!filteredDataGlobal || filteredDataGlobal.length === 0) return showToast("Sem dados para exportar."); const fNf = n => (n !== null && n !== undefined && !isNaN(n)) ? Number(n).toFixed(2).replace('.', ',') : (n || ''); 
+        const dTE = filteredDataGlobal.map(d => ({ 'Data': String(d._displayDate || ''), 'CNPJ': String(d.cnpj || ''), 'Cliente': String(d._customer || ''), 'Tipo': String(d._customerType || ''), 'UF': String(d._state || ''), 'Cidade': String(d._city || ''), 'Distribuidor': String(d._distributor || ''), 'Produto': String(d._product || ''), 'Qtd': d._qty, 'Fat(R$)': fNf(d._amount) })); exportToExcel(dTE, 'Visao_Global', showToast);
+    };
+
+    const yearComparisonData = useMemo(() => {
+        if (!data.length) return { curLabel: '', prevLabel: '', dataCur: [], dataComp: [], curSpan: 12 };
+        
+        const refYears = filters.years.length > 0 ? filters.years.map(Number).sort((a,b) => b-a) : [new Date().getFullYear()];
+        let dataCur = []; let dataComp = []; let curLabel = ''; let prevLabel = ''; let curSpan = 12;
+        
+        const matchesFiltersExcludingDate = (x) => {
+            if (filters.state.length > 0 && !filters.state.includes(x._state)) return false;
+            if (filters.city.length > 0 && !filters.city.includes(x._city)) return false;
+            if (filters.distributor.length > 0 && !filters.distributor.includes(x._distributor)) return false;
+            if (filters.type.length > 0 && !filters.type.includes(x._type)) return false;
+            if (filters.customerType.length > 0 && !filters.customerType.includes(x._customerType)) return false;
+            if (filters.product.length > 0 && !filters.product.includes(x._product)) return false;
+            if (filters.searchCustomer) {
+                const s = removeAccents(filters.searchCustomer).toLowerCase().trim(); const sCDigits = s.replace(/\D/g, '');
+                if (!String(x._customerNorm || '').includes(s) && (!sCDigits || !String(x.cnpj || '').includes(sCDigits))) return false;
+            }
+            if (filters.searchProduct) {
+                const s = removeAccents(filters.searchProduct).toLowerCase().trim(); if (!String(x._productNorm || '').includes(s)) return false;
+            }
+            return true;
+        };
+
+        const baseYear = refYears[0] || new Date().getFullYear();
+        const baseYearRows = data.filter(d => Number(d._year) === baseYear && Number(d._month) > 0);
+        const maxMonthInDb = baseYearRows.length > 0 ? Math.max(...baseYearRows.map(d => Number(d._month))) : 12;
+        const endAbs = baseYear * 12 + maxMonthInDb;
+
+        if (timeMode === 'YTD') {
+            const explicitMonths = filters.months.length > 0 ? filters.months.map(Number) : [];
+            const endMonth = explicitMonths.length > 0 ? Math.max(...explicitMonths) : maxMonthInDb;
+            dataCur = data.filter(x => refYears.includes(Number(x._year)) && (explicitMonths.length > 0 ? explicitMonths.includes(Number(x._month)) : (Number(x._month) >= 1 && Number(x._month) <= endMonth)) && matchesFiltersExcludingDate(x));
+            const prevYears = refYears.map(y => y - 1);
+            dataComp = data.filter(x => prevYears.includes(Number(x._year)) && (explicitMonths.length > 0 ? explicitMonths.includes(Number(x._month)) : (Number(x._month) >= 1 && Number(x._month) <= endMonth)) && matchesFiltersExcludingDate(x));
+            curLabel = `Jan a ${MONTH_NAMES[endMonth - 1]} (${refYears.join(', ')})`;
+            prevLabel = `Jan a ${MONTH_NAMES[endMonth - 1]} (${prevYears.join(', ')})`;
+            curSpan = explicitMonths.length > 0 ? explicitMonths.length : endMonth;
+        } else if (timeMode === 'UDM') {
+            curSpan = 12;
+            dataCur = data.filter(x => {
+                const abs = Number(x._year) * 12 + Number(x._month);
+                return abs >= (endAbs - 11) && abs <= endAbs && matchesFiltersExcludingDate(x);
+            });
+            dataComp = data.filter(x => {
+                const abs = Number(x._year) * 12 + Number(x._month);
+                return abs >= (endAbs - 23) && abs <= (endAbs - 12) && matchesFiltersExcludingDate(x);
+            });
+            curLabel = `Últimos 12 Meses`; prevLabel = `12 Meses Anteriores`;
+        } else if (timeMode === 'U6M') {
+            curSpan = 6;
+            dataCur = data.filter(x => {
+                const abs = Number(x._year) * 12 + Number(x._month);
+                return abs >= (endAbs - 5) && abs <= endAbs && matchesFiltersExcludingDate(x);
+            });
+            dataComp = data.filter(x => {
+                const abs = Number(x._year) * 12 + Number(x._month);
+                return abs >= (endAbs - 11) && abs <= (endAbs - 6) && matchesFiltersExcludingDate(x);
+            });
+            curLabel = `Últimos 6 Meses`; prevLabel = `6 Meses Anteriores`;
+        }
+        return { curLabel, prevLabel, dataCur, dataComp, curSpan };
+    }, [data, filters, timeMode]);
+
+    const globalMetrics = useMemo(() => {
+        if (!yearComparisonData?.dataCur) return { fatCur:0, fatComp:0, capCur:0, capComp:0, novosMain:0, perdidosMain:0, alertaMain:0, precoMedioCur:0, precoMedioGrowth:null, ticketMedioCur:0, ticketMedioGrowth:null, alertaDetails:[], novosDetails:[], perdidosDetails:[], top20Details:[], allClientsRanked:[], fatNovosMain:0, fatPerdidosMain:0 };
+        const { dataCur, dataComp, curSpan } = yearComparisonData; let fC=0; let fCp=0; let qC=0; let qCp=0; const cM = new Map();
+        
+        let maxAbs = 0;
+        for (let d of dataCur) { 
+            fC+=d._amount; qC+=d._qty; 
+            const abs = Number(d._year)*12+Number(d._month);
+            if(abs > maxAbs) maxAbs = abs;
+            const c = String(d.cnpj || '').replace(/\D/g, '') || String(d._customer || ''); 
+            if(c){ 
+                if(!cM.has(c))cM.set(c,{cnpj:d.cnpj,name:d._customer,state:d._state,city:d._city,customerType:d._customerType,fatCur:0,fatComp:0,qtyCur:0,qtyComp:0,maxDateAbs:0}); 
+                const o=cM.get(c); o.fatCur+=d._amount; o.qtyCur+=d._qty; if(abs>o.maxDateAbs)o.maxDateAbs=abs; 
+            } 
+        }
+        for (let d of dataComp) { 
+            fCp+=d._amount; qCp+=d._qty; 
+            const c = String(d.cnpj || '').replace(/\D/g, '') || String(d._customer || ''); 
+            if(c){ 
+                if(!cM.has(c))cM.set(c,{cnpj:d.cnpj,name:d._customer,state:d._state,city:d._city,customerType:d._customerType,fatCur:0,fatComp:0,qtyCur:0,qtyComp:0,maxDateAbs:0}); 
+                const o=cM.get(c); o.fatComp+=d._amount; o.qtyComp+=d._qty; 
+            } 
+        }
+        const nL=[]; const pL=[]; const aL=[]; const aCL=[]; let cpC=0; let cpCp=0; let fN=0; let fP=0; let cA=0;
+        cM.forEach(v => { 
+            const iC=v.fatCur>0; const iCp=v.fatComp>0; v.growth=iCp?((v.fatCur-v.fatComp)/v.fatComp)*100:null; 
+            if(iC){cpC++; aCL.push(v);} if(iCp)cpCp++; if(iC&&!iCp){fN+=v.fatCur; nL.push(v);} if(!iC&&iCp){fP+=v.fatComp; pL.push(v);} 
+            if(iC && maxAbs > 0){ const delay=maxAbs - v.maxDateAbs; if(delay>2&&delay<12){aL.push({...v,atraso:delay,mediaMensal:v.fatCur/(curSpan||12)}); cA++;} } 
+        });
+        aCL.sort((a,b)=>b.fatCur-a.fatCur).forEach((c,i)=>c.rank=i+1); nL.sort((a,b)=>b.fatCur-a.fatCur); pL.sort((a,b)=>b.fatComp-a.fatComp); aL.sort((a,b)=>b.fatCur-a.fatCur);
+        const pmC=qC>0?fC/qC:0; const pmCp=qCp>0?fCp/qCp:0; const tmC=cpC>0?fC/cpC:0; const tmCp=cpCp>0?fCp/cpCp:0;
+        return { fatCur:fC, fatComp:fCp, capCur:cpC, capComp:cpCp, fatGrowth:fCp>0?((fC-fCp)/fCp)*100:null, capGrowth:cpCp>0?((cpC-cpCp)/cpCp)*100:null, novosMain:nL.length, perdidosMain:pL.length, alertaMain:cA, fatNovosMain:fN, fatPerdidosMain:fP, precoMedioCur:pmC, precoMedioGrowth:pmCp>0?((pmC-pmCp)/pmCp)*100:null, ticketMedioCur:tmC, ticketMedioGrowth:tmCp>0?((tmC-tmCp)/tmCp)*100:null, novosDetails:nL, perdidosDetails:pL, alertaDetails:aL, top20Details:aCL.slice(0,20), allClientsRanked:aCL };
+    }, [yearComparisonData]);
+
+    const getRankedPropGlobal = (prop) => {
+        if (!yearComparisonData?.dataCur) return []; const m = new Map();
+        yearComparisonData.dataCur.forEach(d => { const k = d[prop] || 'N/I'; if (!m.has(k)) m.set(k, { curVal: 0, qtyCur: 0, compVal: 0, qtyComp: 0 }); const e = m.get(k); e.curVal += d._amount; e.qtyCur += d._qty; });
+        yearComparisonData.dataComp.forEach(d => { const k = d[prop] || 'N/I'; if (!m.has(k)) m.set(k, { curVal: 0, qtyCur: 0, compVal: 0, qtyComp: 0 }); const e = m.get(k); e.compVal += d._amount; e.qtyComp += d._qty; });
+        const res = Array.from(m.entries()).map(([name,v]) => ({name, ...v})).sort((a,b) => prop === '_product' ? b.qtyCur - a.qtyCur : b.curVal - a.curVal); res.forEach((x,i) => x.rank = i + 1); return res;
+    };
+    
+    const fullRankedProducts = useMemo(() => getRankedPropGlobal('_product'), [yearComparisonData]); 
+    const topProductsGlobal = useMemo(() => fullRankedProducts.slice(0, 10), [fullRankedProducts]);
+    const fullRankedDistributors = useMemo(() => getRankedPropGlobal('_distributor'), [yearComparisonData]); 
+    const topDistribuidoresGlobal = useMemo(() => fullRankedDistributors.slice(0, 10), [fullRankedDistributors]);
+    const topClientsGlobal = useMemo(() => globalMetrics.allClientsRanked.slice(0, 10).map(c => ({...c, curVal: c.fatCur, compVal: c.fatComp, qtyCur: c.qtyCur, qtyComp: c.qtyComp})), [globalMetrics.allClientsRanked]);
+
+    const availableModalDistribuidores = useMemo(() => {
+        const s = new Set(); (yearComparisonData?.dataCur || []).forEach(d => { if (d._distributor && d._distributor !== 'N/I') s.add(d._distributor); }); const rM = new Map(); (fullRankedDistributors || []).forEach(d => rM.set(d.name, d)); const o = [];
+        s.forEach(n => { const rI = rM.get(n); if (rI && rI.curVal > 0) o.push({ value: String(n), label: "#" + String(rI.rank) + " - " + String(n) + " (" + formatCurrency(rI.curVal) + ")", sortVal: rI.curVal }); else o.push({ value: String(n), label: String(n) + " (Sem vendas)", sortVal: -1 }); });
+        o.sort((a, b) => { if (a.sortVal > 0 && b.sortVal > 0) return b.sortVal - a.sortVal; if (a.sortVal > 0) return -1; if (b.sortVal > 0) return 1; return String(a.value || '').localeCompare(String(b.value || '')); }); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL (TODOS)' }); return o;
+    }, [yearComparisonData, fullRankedDistributors]);
+
+    const availableModalProdutos = useMemo(() => {
+        const s = new Set(); (yearComparisonData?.dataCur || []).forEach(d => { if (d._product && d._product !== 'N/I') s.add(d._product); }); const rM = new Map(); (fullRankedProducts || []).forEach(p => rM.set(p.name, p)); const o = [];
+        s.forEach(n => { const rI = rM.get(n); if (rI && rI.qtyCur > 0) o.push({ value: String(n), label: "#" + String(rI.rank) + " - " + String(n) + " (" + (rI.qtyCur||0).toLocaleString('pt-BR') + " un)", sortVal: rI.qtyCur }); else o.push({ value: String(n), label: String(n) + " (Sem vendas)", sortVal: -1 }); });
+        o.sort((a, b) => { if (a.sortVal > 0 && b.sortVal > 0) return b.sortVal - a.sortVal; if (a.sortVal > 0) return -1; if (b.sortVal > 0) return 1; return String(a.value || '').localeCompare(String(b.value || '')); }); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL (TODOS)' }); return o;
+    }, [yearComparisonData, fullRankedProducts]);
+
+    const availableModalClientes = useMemo(() => {
+        const s = new Set(); (yearComparisonData?.dataCur || []).forEach(d => { if (d._customer && d._customer !== 'N/I') s.add(d._customer); }); const rM = new Map(); (globalMetrics.allClientsRanked || []).forEach(c => rM.set(c.name, c)); const o = [];
+        s.forEach(n => { const rI = rM.get(n); if (rI && rI.fatCur > 0) o.push({ value: String(n), label: "#" + String(rI.rank) + " - " + String(n) + " (" + formatCurrency(rI.fatCur) + ")", sortVal: rI.fatCur }); else o.push({ value: String(n), label: String(n) + " (Sem vendas)", sortVal: -1 }); });
+        o.sort((a, b) => { if (a.sortVal > 0 && b.sortVal > 0) return b.sortVal - a.sortVal; if (a.sortVal > 0) return -1; if (b.sortVal > 0) return 1; return String(a.value || '').localeCompare(String(b.value || '')); }); o.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL (TODOS)' }); return o;
+    }, [yearComparisonData, globalMetrics.allClientsRanked]);
+
+    const routingData = useMemo(() => {
+        if (modalConfig.type !== 'routing' || !yearComparisonData?.dataCur) return []; const cMap = new Map();
+        globalMetrics.allClientsRanked.forEach(c => { const loc = `${c.city} - ${c.state}`; if (!cMap.has(loc)) cMap.set(loc, { loc, city: c.city, state: c.state, fatTotal: 0, clients: [], vip: [], drop: [], new: [] }); const cm = cMap.get(loc); cm.fatTotal += c.fatCur; cm.clients.push(c); if (c.rank <= 30) cm.vip.push(c); if (c.growth !== null && c.growth <= -5) cm.drop.push(c); if (c.fatComp === 0 && c.fatCur > 0) cm.new.push(c); });
+        return Array.from(cMap.values()).filter(c => c.clients.length > 1).sort((a,b) => b.fatTotal - a.fatTotal).slice(0, 15);
+    }, [globalMetrics.allClientsRanked, modalConfig.type, yearComparisonData]);
+
+    const evolutionChartData = useMemo(() => {
+        const rD = MONTH_NAMES.map(name => ({ name })); const sY = filters.years.length > 0 ? filters.years.map(Number) : [];
+        if (sY.length === 0 && data.length > 0) { sY.push(...new Set(data.map(d => Number(d._year)))); }
+        const yearsToDisplay = new Set(sY); if (sY.length === 1) { yearsToDisplay.add(sY[0] - 1); }
+        const sortedYears = Array.from(yearsToDisplay).sort((a,b) => a - b);
+        rD.forEach(monthObj => { sortedYears.forEach(year => { monthObj[year] = 0; }); });
+        data.forEach(d => {
+            const yr = Number(d._year); const mt = Number(d._month);
+            if (yearsToDisplay.has(yr) && mt >= 1 && mt <= 12) {
+                if (filters.state.length > 0 && !filters.state.includes(d._state)) return;
+                if (filters.city.length > 0 && !filters.city.includes(d._city)) return;
+                if (filters.distributor.length > 0 && !filters.distributor.includes(d._distributor)) return;
+                if (filters.type.length > 0 && !filters.type.includes(d._type)) return;
+                if (filters.customerType.length > 0 && !filters.customerType.includes(d._customerType)) return;
+                if (filters.product.length > 0 && !filters.product.includes(d._product)) return;
+                if (filters.searchCustomer) {
+                    const s = removeAccents(filters.searchCustomer).toLowerCase().trim(); const sCDigits = s.replace(/\D/g, '');
+                    if (!String(d._customerNorm || '').includes(s) && (!sCDigits || !String(d.cnpj || '').includes(sCDigits))) return;
+                }
+                if (filters.searchProduct) {
+                    const s = removeAccents(filters.searchProduct).toLowerCase().trim(); if (!String(d._productNorm || '').includes(s)) return;
+                }
+                const mIndex = mt - 1; const val = evolucaoMode === 'faturamento' ? d._amount : d._qty; rD[mIndex][yr] += val;
+            }
+        });
+        return { data: rD, lines: sortedYears };
+    }, [data, filters, evolucaoMode]);
+    
+    const evolutionChartMedia = useMemo(() => { const l = evolutionChartData.lines; if (!l.length) return null; const v = evolutionChartData.data.map(d => d[l[l.length - 1]]).filter(x => x !== null && x > 0); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; }, [evolutionChartData]);
+
+    const activeModalDataList = useMemo(() => { if (modalConfig.type === 'novos') return globalMetrics.novosDetails; if (modalConfig.type === 'perdidos') return globalMetrics.perdidosDetails; if (modalConfig.type === 'alerta') return globalMetrics.alertaDetails; return []; }, [modalConfig.type, globalMetrics]);
+    const filteredModalDataList = useMemo(() => { let r = activeModalDataList || []; if (localModalSearch) { const t = removeAccents(String(localModalSearch).toLowerCase().trim()); const tD = t.replace(/\D/g, ''); r = r.filter(d => removeAccents(String(d.name || '').toLowerCase()).includes(t) || (tD && String(d.cnpj || '').includes(tD)) || removeAccents(String(d.city || '').toLowerCase()).includes(t)); } return r; }, [activeModalDataList, localModalSearch]);
+
+    const modalDataFiltered = useMemo(() => {
+        const bTF = yearComparisonData?.dataCur || data; const sT = localModalSearch ? removeAccents(localModalSearch).toLowerCase().trim() : ''; const sD = sT.replace(/\D/g, '');
+        return bTF.filter(x => { if (sT && !(String(x._customerNorm || x.name || '').includes(sT) || (sD && String(x.cnpj || '').includes(sD)) || String(x._productNorm || '').includes(sT) || String(x._cityNorm || '').includes(sT) || String(x._distributorNorm || '').includes(sT))) return false; return true; }).sort((a,b) => { const dir = analiticoSortConfig.direction === 'desc' ? -1 : 1; return analiticoSortConfig.column === 'faturamento' ? ((a._amount || 0) - (b._amount || 0)) * dir : ((a._timestamp || 0) - (b._timestamp || 0)) * dir; });
+    }, [data, yearComparisonData, localModalSearch, analiticoSortConfig]);
+
+    const modalProdutosData = useMemo(() => {
+        if (!['produtos', 'preco'].includes(modalConfig.type)) return []; const pM = new Map();
+        modalDataFiltered.forEach(d => { const q = d._qty; if (q <= 0) return; const p = d._product; if (!pM.has(p)) pM.set(p, { amount: 0, qty: 0, min: Infinity, max: -Infinity, lastPrice: 0, lastDateAbs: 0, minDate: null, lastDateLabel: null }); const e = pM.get(p); e.amount += d._amount; e.qty += q; const px = d._amount / q; if (px < e.min) { e.min = px; e.minDate = d._month && d._year ? `${MONTH_NAMES[Number(d._month) - 1]}/${String(d._year).slice(-2)}` : null; } if (px > e.max) e.max = px; const aD = Number(d._year) * 12 + Number(d._month); if (aD >= e.lastDateAbs) { e.lastDateAbs = aD; e.lastPrice = px; e.lastDateLabel = d._month && d._year ? `${MONTH_NAMES[Number(d._month) - 1]}/${String(d._year).slice(-2)}` : null; } });
+        return Array.from(pM.entries()).map(([name,v]) => ({ name, ...v, avg: v.amount / v.qty, min: v.min === Infinity ? 0 : v.min, max: v.max === -Infinity ? 0 : v.max })).sort((a,b) => modalConfig.type === 'produtos' ? b.qty - a.qty : b.amount - a.amount);
+    }, [modalDataFiltered, modalConfig.type]);
+
+    const detailedEntityData = useMemo(() => {
+        if (!['distribuidores', 'produtos', 'top'].includes(modalConfig.type)) return null; const iD = modalConfig.type === 'distribuidores'; const iP = modalConfig.type === 'produtos'; const iC = modalConfig.type === 'top'; 
+        const isAll = (iD && modalDistributorFilter === 'TODOS') || (iP && modalProductFilter === 'TODOS') || (iC && modalClientFilter === 'TODOS');
+        const cD = isAll ? yearComparisonData.dataCur : yearComparisonData.dataCur.filter(d => { if (iD) return d._distributor === modalDistributorFilter; if (iP) return d._product === modalProductFilter; return d._customer === modalClientFilter; });
+        const cpD = isAll ? yearComparisonData.dataComp : yearComparisonData.dataComp.filter(d => { if (iD) return d._distributor === modalDistributorFilter; if (iP) return d._product === modalProductFilter; return d._customer === modalClientFilter; });
+        let cT=0; let cQT=0; let cpT=0; let cpQT=0; const mM=new Map(); const pM=new Map(); const dM=new Map(); const cliM=new Map(); const cS=new Set();
+        const cSpan = yearComparisonData.curSpan || 12; 
+        
+        const activeYears = cD.length > 0 ? [...new Set(cD.map(x => Number(x._year)))].filter(y => y > 0) : [new Date().getFullYear()];
+        const maxYear = activeYears.length > 0 ? Math.max(...activeYears) : new Date().getFullYear();
+        const yearRows = cD.filter(x => Number(x._year) === maxYear);
+        const maxMonth = yearRows.length > 0 ? Math.max(...yearRows.map(x => Number(x._month))) : 12;
+        const cEndAbs = maxYear * 12 + maxMonth; const startAbs = cEndAbs - cSpan + 1;
+        
+        for (let abs = startAbs; abs <= cEndAbs; abs++) { const y = Math.floor((abs - 1) / 12); const m = ((abs - 1) % 12) + 1; mM.set(abs, { name: `${MONTH_NAMES[m - 1]}/${String(y).slice(-2)}`, valor: 0, qty: 0 }); }
+        cD.forEach(d => { cT+=d._amount; cQT+=d._qty; if(d.cnpj)cS.add(d.cnpj); const abs = Number(d._year) * 12 + Number(d._month); if(mM.has(abs)){mM.get(abs).valor+=d._amount; mM.get(abs).qty+=d._qty;} const p=d._product;if(!pM.has(p))pM.set(p,{name:p,valor:0,qty:0});pM.get(p).valor+=d._amount;pM.get(p).qty+=d._qty; const dist=d._distributor;if(!dM.has(dist))dM.set(dist,{name:dist,valor:0,qty:0});dM.get(dist).valor+=d._amount;dM.get(dist).qty+=d._qty; const cli=d._customer;if(!cliM.has(cli))cliM.set(cli,{name:cli,customerType:d._customerType,state:d._state,city:d._city,valor:0,qty:0});cliM.get(cli).valor+=d._amount;cliM.get(cli).qty+=d._qty; });
+        cpD.forEach(d => { cpT+=d._amount; cpQT+=d._qty; });
+        let fR=null; if(!isAll) { if(iD){const f=fullRankedDistributors.find(x=>x.name===modalDistributorFilter);if(f)fR=f.rank;}else if(iP){const f=fullRankedProducts.find(x=>x.name===modalProductFilter);if(f)fR=f.rank;}else if(iC){const f=globalMetrics.allClientsRanked.find(x=>x.name===modalClientFilter);if(f)fR=f.rank;} }
+        return { entityCnpj: (iC && !isAll) ? cD[0]?.cnpj : null, curTotal:cT, curQtyTotal:cQT, compTotal:cpT, compQtyTotal:cpQT, growth: cpT>0?((cT-cpT)/cpT)*100:null, growthQty: cpQT>0?((cQT-cpQT)/cpQT)*100:null, capilaridade: cS.size, avgPrice: cQT>0?cT/cQT:0, lastPrice: cQT>0?cT/cQT:0, monthlyTrend: Array.from(mM.values()), topProductsFat: Array.from(pM.values()).sort((a,b)=>b.valor-a.valor), topProductsQty: Array.from(pM.values()).sort((a,b)=>b.qty-a.qty), topDistributorsFat: Array.from(dM.values()).sort((a,b)=>b.valor-a.valor), topDistributorsQty: Array.from(dM.values()).sort((a,b)=>b.qty-a.qty), topClientsFat: Array.from(cliM.values()).sort((a,b)=>b.valor-a.valor), topClientsQty: Array.from(cliM.values()).sort((a,b)=>b.qty-a.qty), rank: fR, isAll: isAll };
+    }, [yearComparisonData, modalConfig.type, modalClientFilter, modalProductFilter, modalDistributorFilter, fullRankedDistributors, fullRankedProducts, globalMetrics.allClientsRanked]);
+
+    const pieChartDataMain = useMemo(() => {
+        if (!yearComparisonData?.dataCur) return []; const m = new Map(); const kP = pieChartMetric === 'Tipo Cliente' ? '_customerType' : pieChartMetric === 'Unidade' ? '_type' : pieChartMetric === 'Cidade' ? '_city' : pieChartMetric === 'UF' ? '_state' : '_distributor';
+        yearComparisonData.dataCur.forEach(d => { let s = d[kP] || 'Outros'; if (s === 'N/I' || s === 'Não Informado') s = 'Outros'; if (!m.has(s)) m.set(s, { curVal: 0, compVal: 0 }); m.get(s).curVal += d._amount; });
+        yearComparisonData.dataComp.forEach(d => { let s = d[kP] || 'Outros'; if (s === 'N/I' || s === 'Não Informado') s = 'Outros'; if (!m.has(s)) m.set(s, { curVal: 0, compVal: 0 }); m.get(s).compVal += d._amount; });
+        return Array.from(m.entries()).map(([name,v]) => ({ name, value: v.curVal, curVal: v.curVal, compVal: v.compVal, growth: v.compVal > 0 ? ((v.curVal - v.compVal) / v.compVal) * 100 : null })).filter(d => d.curVal > 0).sort((a,b) => b.curVal - a.curVal).slice(0, 20); 
+    }, [yearComparisonData, pieChartMetric]);
+
+    const representatividadeDetails = useMemo(() => {
+        if (modalConfig.type !== 'representatividade' || !yearComparisonData?.dataCur) return null; const kP = pieChartMetric === 'Tipo Cliente' ? '_customerType' : pieChartMetric === 'Unidade' ? '_type' : pieChartMetric === 'Cidade' ? '_city' : pieChartMetric === 'UF' ? '_state' : '_distributor';
+        let tG = 0; const gPM = new Map(); const oM = new Map();
+        yearComparisonData.dataCur.forEach(d => { const v = d[kP] || 'Outros'; oM.set(v, (oM.get(v) || 0) + d._amount); tG += d._amount; gPM.set(d._product || 'N/I', (gPM.get(d._product || 'N/I') || 0) + d._amount); });
+        const dO = Array.from(oM.entries()).map(([v,a]) => ({ value: String(v), label: String(v) + " (" + formatCurrency(a) + ")", sortVal: a })).sort((a,b) => b.sortVal - a.sortVal); dO.unshift({ value: 'TODOS', label: '🌟 VISÃO GERAL (SELECIONE UM SEGMENTO)' });
+        if (modalRepFilter === 'TODOS') return { options: dO, opportunities: [], clientList: [], topProducts: [], topClients: [], clientProductMap: new Map(), isOverview: true };
+        const fF = d => d[kP] === modalRepFilter; const cD = yearComparisonData.dataCur.filter(fF); const pD = yearComparisonData.dataComp.filter(fF); 
+        let sFC = 0; let sFp = 0; const cS = new Set(); const sPM = new Map(); const cM = new Map(); const cPM = new Map(); 
+        cD.forEach(d => { sFC += d._amount; const cK = d.cnpj || d._customer; if (cK) { cS.add(cK); if (!cPM.has(cK)) cPM.set(cK, new Set()); cPM.get(cK).add(d._product || 'N/I'); } const p = d._product || 'N/I'; sPM.set(p, (sPM.get(p) || 0) + d._amount); if (!cM.has(cK)) cM.set(cK, { cnpj: d.cnpj, name: d._customer, state: d._state, city: d._city, customerType: d._customerType, fatCur: 0, fatComp: 0, cKey: cK }); cM.get(cK).fatCur += d._amount; });
+        pD.forEach(d => { sFp += d._amount; const cK = d.cnpj || d._customer; if (cM.has(cK)) cM.get(cK).fatComp += d._amount; });
+        const cL = Array.from(cM.values()).map(c => ({ ...c, growth: c.fatComp > 0 ? ((c.fatCur - c.fatComp) / c.fatComp) * 100 : null })).sort((a,b) => b.fatCur - a.fatCur); cL.forEach((c, i) => c.rank = i + 1);
+        const tPL = Array.from(sPM.entries()).map(([name, valor]) => ({name, valor})).sort((a,b) => b.valor - a.valor).slice(0, 10); const tCL = cL.slice(0, 10).map(c => ({name: c.name, valor: c.fatCur}));
+        const gR = Array.from(gPM.entries()).map(([name, amount]) => ({ name, amount, share: tG > 0 ? amount / tG : 0 })).sort((a, b) => b.amount - a.amount); const gRM = new Map(); gR.forEach((i, idx) => gRM.set(i.name, idx + 1));
+        let opps = []; let tGC = 0; gR.slice(0, 100).forEach(gP => { const aSF = sPM.get(gP.name) || 0; const eSF = gP.share * sFC; const gap = eSF - aSF; if (gap > 0 && aSF < (eSF * 0.8)) { opps.push({ name: gP.name, globalRank: gRM.get(gP.name), globalShare: gP.share * 100, actualFat: aSF, expectedFat: eSF, gap: gap, status: aSF === 0 ? 'Não Explorado' : 'Baixa Penetração' }); tGC += gap; } }); opps.sort((a,b) => b.gap - a.gap);
+        const aCL = selectedOpportunity ? cL.filter(c => { const p = cPM.get(c.cKey); return !p || !p.has(selectedOpportunity); }) : cL;
+        return { fatCur: sFC, fatComp: sFp, capilaridade: cS.size, growth: sFp > 0 ? ((sFC - sFp) / sFp) * 100 : null, clientList: aCL, topProducts: tPL, topClients: tCL, options: dO, opportunities: opps, totalGap: tGC, clientProductMap: cPM, isOverview: false };
+    }, [yearComparisonData, modalConfig.type, modalRepFilter, pieChartMetric, selectedOpportunity]);
+
+    const scatterPlotData = useMemo(() => {
+        if (!yearComparisonData?.dataCur) return { data: [], filtered: [], avgFat: 0, avgGrowth: 0, thresholdG: 0 }; 
+        const m = new Map(); const kP = scatterMetric === 'produtos' ? '_product' : scatterMetric === 'distribuidores' ? '_distributor' : '_customer';
+        yearComparisonData.dataCur.forEach(d => { const k = d[kP] || 'Outros'; if (!m.has(k)) m.set(k, { name: k, fatCur: 0, fatComp: 0 }); m.get(k).fatCur += d._amount; });
+        yearComparisonData.dataComp.forEach(d => { const k = d[kP] || 'Outros'; if (!m.has(k)) m.set(k, { name: k, fatCur: 0, fatComp: 0 }); m.get(k).fatComp += d._amount; });
+        let aV = Array.from(m.values()).filter(d => d.fatComp > 0 && d.fatCur > 0).map(d => ({ ...d, growth: ((d.fatCur - d.fatComp) / d.fatComp) * 100 })).sort((a,b) => b.fatCur - a.fatCur);
+        const aF = aV.length > 0 ? aV.reduce((a, d) => a + d.fatCur, 0) / aV.length : 0; const tFC = aV.reduce((a, d) => a + d.fatCur, 0); const tFp = aV.reduce((a, d) => a + d.fatComp, 0); 
+        const aG = tFp > 0 ? ((tFC - tFp) / tFp) * 100 : 0; const tG = isNaN(aG) ? 0 : Math.max(0, aG);
+        const dWQ = aV.map((e, i) => { let q = ''; let c = ''; let bg = ''; let fh = '#cbd5e1'; if (e.fatCur >= aF && e.growth >= tG) { q = 'Estrela'; c = 'text-emerald-700'; bg = 'bg-emerald-100'; fh = '#10b981'; } else if (e.fatCur >= aF && e.growth < tG) { q = 'Vaca Leiteira'; c = 'text-blue-700'; bg = 'bg-blue-100'; fh = '#3b82f6'; } else if (e.fatCur < aF && e.growth >= tG) { q = 'Aposta'; c = 'text-amber-700'; bg = 'bg-amber-100'; fh = '#f59e0b'; } else { q = 'Abacaxi'; c = 'text-rose-700'; bg = 'bg-rose-100'; fh = '#ef4444'; } return { ...e, rank: i+1, quadrant: q, color: c, bg: bg, fillHex: fh }; });
+        const flt = dWQ.filter(d => { if (localModalSearch && !removeAccents(d.name).toLowerCase().includes(removeAccents(localModalSearch).toLowerCase())) return false; return true; }).sort((a,b) => { const col = matrizSortConfig.column; const dir = matrizSortConfig.direction === 'desc' ? -1 : 1; if (col === 'quadrant' || col === 'name') return String(a[col] || '').localeCompare(String(b[col] || '')) * dir; return ((a[col] || 0) - (b[col] || 0)) * dir; });
+        return { data: dWQ.slice(0, 50), filtered: flt, avgFat: aF, avgGrowth: aG, thresholdG: tG, hasHistory: aV.length > 0 };
+    }, [yearComparisonData, scatterMetric, localModalSearch, matrizSortConfig]);
+
+    const chartDataCapilaridade = useMemo(() => {
+        if (!data.length || modalConfig.type !== 'capilaridade') return []; const m = new Map();
+        modalDataFiltered.forEach(d => { if (!d._year || !d._month || !d.cnpj) return; const k = String(d._year) + "-" + String(d._month); if (!m.has(k)) m.set(k, { totalSet: new Set(), year: d._year, month: d._month }); m.get(k).totalSet.add(d.cnpj); });
+        return Array.from(m.values()).sort((a,b) => a.year !== b.year ? a.year - b.year : a.month - b.month).map(x => ({ name: MONTH_NAMES[x.month-1] + "/" + String(x.year).slice(2), Total: x.totalSet.size }));
+    }, [modalDataFiltered, data.length, modalConfig.type]);
+
+    const totalAnaliticoQtd = useMemo(() => modalDataFiltered.reduce((a,d) => a + (Number(d._qty) || 0), 0), [modalDataFiltered]); 
+    const totalAnaliticoFat = useMemo(() => modalDataFiltered.reduce((a,d) => a + (Number(d._amount) || 0), 0), [modalDataFiltered]); 
+    const precoMedioAnalitico = totalAnaliticoQtd > 0 ? totalAnaliticoFat / totalAnaliticoQtd : 0;
+    
+    const abcDataRaw = useMemo(() => {
+        if (modalConfig.type !== 'abc' || !yearComparisonData?.dataCur) return null; const m = new Map(); let tF = 0;
+        yearComparisonData.dataCur.forEach(d => { const k = abcDimension === 'clientes' ? d._customer : d._product; const vK = k && k !== 'N/I' && k !== 'Não Informado' ? k : 'Outros'; if (!m.has(vK)) m.set(vK, { amount: 0, cnpj: d.cnpj || '', customerType: d._customerType, city: d._city, state: d._state }); const e = m.get(vK); e.amount += d._amount; if (!e.cnpj && d.cnpj) e.cnpj = d.cnpj; tF += d._amount; });
+        const l = Array.from(m.entries()).map(([name, v]) => ({ name, ...v })).sort((a,b) => b.amount - a.amount); let a = 0; let cA = 0; let cB = 0; let cC = 0; let fA = 0; let fB = 0; let fC = 0;
+        const rL = l.map((x, i) => { a += x.amount; const p = tF > 0 ? (x.amount / tF) * 100 : 0; const aP = tF > 0 ? (a / tF) * 100 : 0; let c = 'C'; if (aP <= 80 || (cA === 0 && i === 0)) { c = 'A'; cA++; fA += x.amount; } else if (aP <= 95) { c = 'B'; cB++; fB += x.amount; } else { c = 'C'; cC++; fC += x.amount; } return { ...x, rank: i+1, pct: p, accPct: aP, curve: c }; });
+        return { list: rL, totalFat: tF, countA: cA, countB: cB, countC: cC, fatA: fA, fatB: fB, fatC: fC };
+    }, [yearComparisonData, modalConfig.type, abcDimension]);
+
+    const filteredAbcList = useMemo(() => { if (!abcDataRaw) return []; if (!localModalSearch) return abcDataRaw.list; const term = removeAccents(localModalSearch).toLowerCase().trim(); return abcDataRaw.list.filter(x => removeAccents(String(x.name)).toLowerCase().includes(term)); }, [abcDataRaw, localModalSearch]);
+
+    const sortedClientsList = useMemo(() => {
+        if (modalConfig.type !== 'top' || modalClientFilter !== 'TODOS') return []; let s = [...(globalMetrics.allClientsRanked || [])];
+        if (localModalSearch) { const t = removeAccents(localModalSearch).toLowerCase().trim(); const tD = t.replace(/\D/g, ''); s = s.filter(d => removeAccents(String(d.name || '').toLowerCase()).includes(t) || (tD && String(d.cnpj || '').includes(tD)) || removeAccents(String(d.city || '').toLowerCase()).includes(t)); }
+        return s.sort((a,b) => { let aV = a[clientSortConfig.column]; let bV = b[clientSortConfig.column]; if (aV === null || aV === undefined) aV = ''; if (bV === null || bV === undefined) bV = ''; if (typeof aV === 'string' && typeof bV === 'string') { return clientSortConfig.direction === 'asc' ? aV.localeCompare(bV) : bV.localeCompare(aV); } if (aV < bV) return clientSortConfig.direction === 'asc' ? -1 : 1; if (aV > bV) return clientSortConfig.direction === 'asc' ? 1 : -1; return 0; });
+    }, [globalMetrics.allClientsRanked, clientSortConfig, modalConfig.type, modalClientFilter, localModalSearch]);
+
+    const totalModalFatCur = useMemo(() => filteredModalDataList.reduce((a,d) => a + (d.fatCur || 0), 0), [filteredModalDataList]);
+    const totalModalFatComp = useMemo(() => filteredModalDataList.reduce((a,d) => a + (d.fatComp || 0), 0), [filteredModalDataList]);
+
+    const handleExportRoutes = () => {
+        if (!routingData || routingData.length === 0) {
+            showToast("Sem rotas para exportar.");
+            return;
+        }
+        const dataToExport = [];
+        routingData.forEach((rota, idx) => {
+            rota.clients.forEach((cli, i) => {
+                dataToExport.push({
+                    'Rota': `Rota ${idx + 1} (${rota.loc})`,
+                    'Rank na Rota': i + 1,
+                    'Cliente': String(cli.name),
+                    'CNPJ': formatCnpj(cli.cnpj),
+                    'Cidade': String(cli.city),
+                    'Estado': String(cli.state),
+                    'Faturamento (R$)': (Number(cli.fatCur)||0).toFixed(2).replace('.',','),
+                    'Crescimento (%)': cli.growth !== null ? Number(cli.growth).toFixed(1).replace('.',',') : ''
+                });
+            });
+        });
+        exportToExcel(dataToExport, `Planejamento_Rotas_${timeMode}`, showToast);
+    };
+
+    const handleExportModalExcelData = () => {
+        let dTE = []; let fN = String(modalConfig.type || 'Export').replace(/[^a-z0-9]/gi, '_').toLowerCase(); 
+        const fNf = n => (n !== null && n !== undefined && !isNaN(n)) ? Number(n).toFixed(2).replace('.', ',') : (n || ''); const fI = n => (n !== null && n !== undefined && !isNaN(n)) ? Number(n).toString() : (n || '');
+        if (modalConfig.type === 'analitico') { dTE = modalDataFiltered.map(d => ({ 'Data': String(d._displayDate), 'CNPJ': String(d.cnpj), 'Cliente': String(d._customer), 'Tipo Cliente': String(d._customerType), 'UF': String(d._state), 'Cidade': String(d._city), 'Distribuidor': String(d._distributor), 'Produto': String(d._product), 'Quantidade': fI(d._qty), 'Faturamento (R$)': fNf(d._amount), 'Preço Unitário (R$)': d._qty > 0 ? fNf(d._amount / d._qty) : '0,00' })); } else if (modalConfig.type === 'matriz') { dTE = scatterPlotData.filtered.map(d => ({ 'Rank': d.rank, 'Nome': String(d.name), 'Faturamento Atual (R$)': fNf(d.fatCur), 'Faturamento Anterior (R$)': fNf(d.fatComp), 'Crescimento (%)': fNf(d.growth), 'Quadrante Estratégico': String(d.quadrant) })); } else if (modalConfig.type === 'representatividade') { if (!representatividadeDetails) return; if (modalRepFilter === 'TODOS') { showToast("Selecione um segmento primeiro."); return; } const sWS = ['UF', 'Cidade', 'Distribuidor'].includes(pieChartMetric); if (sWS) { if (selectedOpportunity) { fN = "alvos_oferecer_" + String(selectedOpportunity).replace(/[^a-z0-9]/gi, '_').toLowerCase(); dTE = representatividadeDetails.clientList.filter(c => { const p = representatividadeDetails.clientProductMap.get(c.cKey); return !p || !p.has(selectedOpportunity); }).map((d, i) => ({ 'Rank Cliente no Segmento': i + 1, 'Cliente': String(d.name), 'CNPJ': String(d.cnpj), 'Cidade': String(d.city), 'Estado': String(d.state), 'Faturamento do Cliente (R$)': fNf(d.fatCur), 'Oportunidade': String(selectedOpportunity) })); } else { dTE = representatividadeDetails.opportunities.map(d => ({ 'Rank Global': d.globalRank, 'Produto': String(d.name), 'Status': String(d.status), 'Fat. Atual (R$)': fNf(d.actualFat), 'Potencial (R$)': fNf(d.gap) })); } } else { dTE = representatividadeDetails.clientList.map(d => ({ 'Rank': d.rank, 'Cliente': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Fat. Atual (R$)': fNf(d.fatCur), 'Fat. Anterior (R$)': fNf(d.fatComp), 'Crescimento (%)': d.growth !== null ? fNf(d.growth) : '' })); } } else if (modalConfig.type === 'abc') { dTE = filteredAbcList.map(d => ({ 'Rank': d.rank, 'Nome': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Faturamento (R$)': fNf(d.amount), 'Repres. (%)': fNf(d.pct), 'Acumulada (%)': fNf(d.accPct), 'Curva': String(d.curve) })); } else if (['novos', 'perdidos', 'alerta'].includes(modalConfig.type)) { dTE = filteredModalDataList.map((d,i) => ({ 'Rank': i + 1, 'Cliente': String(d.name), 'CNPJ': String(d.cnpj), 'Tipo Cliente': String(d.customerType), 'UF': String(d.state), 'Cidade': String(d.city), 'Fat. Atual (R$)': fNf(d.fatCur), 'Fat. Anterior (R$)': fNf(d.fatComp), 'Crescimento (%)': d.growth !== null ? fNf(d.growth) : '', 'Média Mensal (R$)': d.mediaMensal ? fNf(d.mediaMensal) : '', 'Atraso (Meses)': d.atraso ? fI(d.atraso) : '' })); } else if (['distribuidores', 'produtos', 'top'].includes(modalConfig.type)) { let listToExport = []; const d = detailedEntityData; if (modalConfig.type === 'top') { listToExport = d.isAll ? globalMetrics.allClientsRanked.map(c => ({...c, valor: c.fatCur, qty: c.qtyCur})) : d.topDistributorsFat; } else if (modalConfig.type === 'distribuidores') { listToExport = d.isAll ? fullRankedDistributors.map(dist => ({...dist, valor: dist.curVal, qty: dist.qtyCur})) : d.topClientsFat; } else if (modalConfig.type === 'produtos') { listToExport = d.isAll ? fullRankedProducts.map(p => ({...p, valor: p.curVal, qty: p.qtyCur})) : d.topClientsFat; } if (localModalSearch) { const term = removeAccents(localModalSearch).toLowerCase().trim(); listToExport = listToExport.filter(item => removeAccents(String(item.name || '')).toLowerCase().includes(term) || removeAccents(String(item.cnpj || '')).toLowerCase().includes(term) || removeAccents(String(item.city || '')).toLowerCase().includes(term) ); } dTE = listToExport.map((item, idx) => { const base = { 'Rank': idx + 1, 'Nome': String(item.name || ''), }; if (item.cnpj) base['CNPJ'] = formatCnpj(item.cnpj); if (item.customerType) base['Tipo Cliente'] = String(item.customerType); if (item.city) base['Cidade'] = String(item.city); if (item.state) base['Estado'] = String(item.state); base['Faturamento (R$)'] = fNf(item.valor || item.curVal || item.fatCur || 0); base['Quantidade'] = fI(item.qty || item.qtyCur || item.qtyComp || 0); const totalVal = item.valor || item.curVal || item.fatCur || 0; const totalQty = item.qty || item.qtyCur || item.qtyComp || 0; base['Preço Médio (R$)'] = totalQty > 0 ? fNf(totalVal / totalQty) : '0,00'; base['Participação (%)'] = fNf(((totalVal / (d.curTotal || globalMetrics.fatCur)) * 100)); return base; }); } else if (modalConfig.type === 'preco') { dTE = modalProdutosData.map(p => ({ 'Produto': String(p.name), 'Qtd Vendida': fI(p.qty), 'Faturamento Total (R$)': fNf(p.amount), 'Menor Preço (R$)': fNf(p.min), 'Preço Médio (R$)': fNf(p.avg), 'Último Preço (R$)': fNf(p.lastPrice), 'Data Menor': String(p.minDate || ''), 'Data Último': String(p.lastDateLabel || '') })); } else if (modalConfig.type === 'capilaridade') { dTE = chartDataCapilaridade.map(d => ({'Período': String(d.name), 'Total (PDVs)': d.Total})); }
+        exportToExcel(dTE, fN, showToast);
+    };
+
+    let modalTitle = ''; let modalDesc = ''; let IconName = "List"; const showWhiteSpace = ['UF', 'Cidade', 'Distribuidor'].includes(pieChartMetric);
+    if (modalConfig.type === 'novos') { modalTitle = `Clientes Novos (${timeMode})`; modalDesc = `Sem compras no ciclo anterior`; IconName = "UserPlus"; } else if (modalConfig.type === 'perdidos') { modalTitle = `Clientes Perdidos (${timeMode})`; modalDesc = `Sem compras neste ciclo atual`; IconName = "UserMinus"; } else if (modalConfig.type === 'top') { modalTitle = `Raio-X de Clientes (${timeMode})`; modalDesc = modalClientFilter !== 'TODOS' && detailedEntityData && detailedEntityData.entityCnpj ? "CNPJ: " + formatCnpj(detailedEntityData.entityCnpj) + " | Comportamento" : `Comportamento e Tração Global`; IconName = "Users"; } else if (modalConfig.type === 'alerta') { modalTitle = `Clientes Em Alerta (${timeMode})`; modalDesc = `Ultrapassaram a previsão de recompra`; IconName = "AlertCircle"; } else if (modalConfig.type === 'capilaridade') { modalTitle = `Evolução de Capilaridade (${timeMode})`; modalDesc = `PDVs ativos por mês`; IconName = "TrendingUp"; } else if (modalConfig.type === 'preco') { modalTitle = `Análise de Preços (${timeMode})`; modalDesc = `Variação de preços da seleção atual`; IconName = "Package"; } else if (modalConfig.type === 'produtos') { modalTitle = `Raio-X de Produtos (${timeMode})`; modalDesc = `Desempenho e Tração Global`; IconName = "Package"; } else if (modalConfig.type === 'distribuidores') { modalTitle = `Raio-X de Distribuidores (${timeMode})`; modalDesc = `Tração de Canais Global`; IconName = "Truck"; } else if (modalConfig.type === 'analitico') { modalTitle = `Visão Analítica (${timeMode})`; modalDesc = `Detalhamento linha a linha`; IconName = "List"; } else if (modalConfig.type === 'abc') { modalTitle = `Curva ABC de Pareto (${timeMode})`; modalDesc = `Princípio de Pareto (80/15/5)`; IconName = "Target"; } else if (modalConfig.type === 'assistente') { modalTitle = `Assistente Virtual de Dados`; modalDesc = `Resumo Automático com base nos filtros atuais`; IconName = "BookOpen"; } else if (modalConfig.type === 'matriz') { modalTitle = `Raio-X Matriz de Performance (${timeMode})`; modalDesc = "Quadrantes (" + scatterMetric + ")"; IconName = "Target"; } else if (modalConfig.type === 'routing') { modalTitle = `Planejador Inteligente de Rotas (${timeMode})`; modalDesc = "Sugestões de visitas por concentração geográfica."; IconName = "MapPin"; } else if (modalConfig.type === 'representatividade') { modalTitle = showWhiteSpace ? `Oportunidades de Mix (${timeMode})` : `Raio-X de Segmento: ${pieChartMetric} (${timeMode})`; modalDesc = showWhiteSpace ? `Identificação de produtos sem penetração neste segmento` : `Análise de faturamento e carteira deste segmento`; IconName = "MapPin"; } else if (modalConfig.type === 'manual') { modalTitle = `Manual de Conceitos e Funcionalidades`; modalDesc = `Guia geral de operação do Dashboard`; IconName = "BookOpen"; }
+
+    const getModalBadge = () => {
+        if (['novos', 'perdidos', 'alerta'].includes(modalConfig.type)) return filteredModalDataList.length.toLocaleString('pt-BR') + " cli."; if (modalConfig.type === 'preco') return modalProdutosData.length.toLocaleString('pt-BR') + " prod."; if (modalConfig.type === 'analitico') return modalDataFiltered.length.toLocaleString('pt-BR') + " linhas"; if (modalConfig.type === 'matriz') return scatterPlotData.filtered.length.toLocaleString('pt-BR') + " itens";
+        if (modalConfig.type === 'representatividade' && representatividadeDetails && !representatividadeDetails.isOverview) { const cList = selectedOpportunity ? representatividadeDetails.clientList.filter(c => { const p = representatividadeDetails.clientProductMap.get(c.cKey); return !p || !p.has(selectedOpportunity); }) : representatividadeDetails.clientList; return cList.length.toLocaleString('pt-BR') + " cli."; } return null;
+    }; 
+
+    const ActiveFiltersDisplay = () => {
+        const active = [];
+        if(filters.years.length) active.push(`Anos: ${filters.years.join(', ')}`); if(filters.months.length) active.push(`Meses: ${filters.months.join(', ')}`); if(filters.state.length) active.push(`UF: ${filters.state.join(', ')}`); if(filters.city.length) active.push(`Cidades: ${filters.city.length} sel.`); if(filters.distributor.length) active.push(`Distribuidores: ${filters.distributor.length} sel.`); if(filters.customerType.length) active.push(`Tipos: ${filters.customerType.length} sel.`);
+        if (active.length === 0) return null;
+        return (
+            <div className="flex flex-wrap gap-1 mb-2 no-print shrink-0">
+                <span className="text-[8px] font-black text-slate-400 uppercase mr-1 py-0.5">Filtros Globais Aplicados:</span>
+                {active.map((f, i) => <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[7.5px] font-bold border border-blue-100 shadow-sm">{f}</span>)}
+            </div>
+        );
+    };
+
+    const renderModalBody = () => {
+        let modalInsight = null;
+        if (modalConfig.type === 'perdidos' && filteredModalDataList.length > 0) { modalInsight = `O impacto total deste churn é de ${formatCurrency(totalModalFatComp)} que deixaram de entrar no caixa.`; } 
+        else if (modalConfig.type === 'top' && detailedEntityData) { if(detailedEntityData.isAll) modalInsight = `Estes clientes compõem a base principal da sua faturação total de ${formatCurrency(detailedEntityData.curTotal)}.`; else modalInsight = `Este cliente representa ${((detailedEntityData.curTotal / globalMetrics.fatCur)*100).toFixed(1)}% do faturamento global ativo (${formatCurrency(detailedEntityData.curTotal)}).`; } 
+        else if (modalConfig.type === 'produtos' && detailedEntityData && !detailedEntityData.isAll) { modalInsight = `Este produto representa ${((detailedEntityData.curTotal / globalMetrics.fatCur)*100).toFixed(1)}% das vendas globais do período.`; }
+        else if (modalConfig.type === 'matriz') { const estrelas = scatterPlotData.filtered.filter(d=>d.quadrant==='Estrela'); const fatE = estrelas.reduce((a,b)=>a+b.fatCur,0); modalInsight = `Você possui ${estrelas.length} Estrelas gerando ${formatCurrency(fatE)}. Foco total em mantê-las a crescer!`; }
+
+        if (modalConfig.type === 'manual') {
+            return (
+                <div className="p-4 lg:p-6 text-slate-700 max-w-4xl mx-auto bg-white min-h-full rounded-2xl shadow-sm my-2">
+                    <div className="flex items-center gap-3 mb-6 border-b border-slate-200 pb-4">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shadow-inner">
+                            <Icon name="BookOpen" size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight">Guia de Conceitos e Funcionalidades</h3>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Entenda o funcionamento do Painel Comercial</p>
+                        </div>
+                    </div>
+                    <div className="space-y-6 text-xs leading-relaxed">
+                        <section>
+                            <h4 className="text-sm font-black text-slate-800 mb-2 border-l-4 border-blue-500 pl-2">1. Conceito do Dashboard (Sellout)</h4>
+                            <p>Este painel consolida as vendas ponta-a-ponta, ou seja, as transações efetuadas pelos <strong>Distribuidores</strong> diretamente aos <strong>Pontos de Venda (PDVs)</strong>. Ao contrário das métricas de Sell-in (venda da indústria para o distribuidor), o Sellout reflete a real velocidade de escoamento e a demanda do mercado consumidor final nas lojas físicas.</p>
+                        </section>
+                        <section>
+                            <h4 className="text-sm font-black text-slate-800 mb-2 border-l-4 border-blue-500 pl-2">2. Recortes Temporais de Análise</h4>
+                            <ul className="list-disc pl-5 space-y-1.5 mt-1">
+                                <li><strong>YTD (Year to Date):</strong> Acumula os dados de faturamento e volume do início do ano corrente até o mês ativo mais recente encontrado na base de dados.</li>
+                                <li><strong>UDM (Últimos Doze Meses):</strong> Aplica uma janela móvel deslizante retroativa de 12 meses, ideal para expurgar efeitos de sazonalidade e avaliar tendências anuais reais.</li>
+                                <li><strong>U6M (Últimos Seis Meses):</strong> Foco tático na janela móvel de curto prazo de 6 meses, facilitando a rápida identificação de desvios de rota e velocidade de novos SKUs.</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h4 className="text-sm font-black text-slate-800 mb-2 border-l-4 border-blue-500 pl-2">3. Indicadores de Saúde de Carteira</h4>
+                            <ul className="list-disc pl-5 space-y-2 mt-1">
+                                <li><strong>Faturamento & Evolução:</strong> Compara o faturamento bruto atual com o período histórico equivalente anterior (crescimento ou retração).</li>
+                                <li><strong>Preço Médio vs Ticket Médio:</strong> Preço médio unitário obtido por peça/unidade. O botão de alternar exibe o Ticket Médio gasto por cliente ativo faturado.</li>
+                                <li><strong>Capilaridade:</strong> Número de CNPJs únicos ativos com compra num período. Clicando no KPI, abre-se a evolução temporal de capilaridade para auditar expansão.</li>
+                                <li><strong>Clientes Novos:</strong> Clientes que efetuaram compras no período atual, mas que não possuíam registo de compras no período homólogo anterior.</li>
+                                <li><strong>Em Alerta:</strong> Clientes ativos cujo tempo decorrido desde a última compra superou a frequência de recompra esperada, indicando risco imediato de perda de carteira (Churn).</li>
+                                <li><strong>Clientes Perdidos:</strong> Churn real da base de dados (clientes faturados no período homólogo anterior mas que registaram faturamento zero no ciclo atual).</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h4 className="text-sm font-black text-slate-800 mb-2 border-l-4 border-blue-500 pl-2">4. Matriz BCG Estratégica</h4>
+                            <p>Classifica clientes, distribuidores ou produtos num gráfico quadrante que cruza o faturamento consolidado (Eixo Y) com o crescimento percentual obtido (Eixo X):</p>
+                            <ul className="list-disc pl-5 space-y-1 mt-1">
+                                <li><strong>Estrelas (Faturamento Alto & Crescimento Alto):</strong> Líderes de mercado que continuam em forte ritmo de expansão. Exigem investimento contínuo.</li>
+                                <li><strong>Vacas Leiteiras (Faturamento Alto & Crescimento Baixo):</strong> Geradores de caixa robustos, estáveis e maduros. Exigem ações de retenção e proteção.</li>
+                                <li><strong>Apostas (Faturamento Baixo & Crescimento Alto):</strong> Itens ou contas de menor dimensão, mas com forte potencial de crescimento exponencial.</li>
+                                <li><strong>Abacaxis (Faturamento Baixo & Crescimento Baixo):</strong> Contas ou produtos estagnados ou em declínio de relevância.</li>
+                            </ul>
+                        </section>
+                        <section>
+                            <h4 className="text-sm font-black text-slate-800 mb-2 border-l-4 border-blue-500 pl-2">5. Curva ABC (Princípio de Pareto)</h4>
+                            <p>Aplica o conceito de que 80% do seu resultado financeiro provém de cerca de 20% da sua carteira de clientes ou produtos. Divide os registos em três faixas de importância financeira:</p>
+                            <ul className="list-disc pl-5 space-y-1 mt-1">
+                                <li><strong>Classe A (Top 80% do Faturamento):</strong> O grupo vital de maior relevância, responsável pela sobrevivência do negócio.</li>
+                                <li><strong>Classe B (Próximos 15%):</strong> Grupo intermediário com relevância moderada.</li>
+                                <li><strong>Classe C (Últimos 5%):</strong> A longa cauda de clientes ou itens de baixo impacto financeiro individual, mas que exigem controle para evitar despesas operacionais excessivas.</li>
+                            </ul>
+                        </section>
+                    </div>
+                </div>
+            );
+        }
+
+        if (modalConfig.type === 'assistente') {
+            const m = globalMetrics; const topProd = fullRankedProducts[0]?.name || 'Nenhum dado'; const topCli = topClientsGlobal[0]?.name || 'Nenhum dado'; 
+            return (
+                <div className="p-3 lg:p-6 text-slate-700 max-w-4xl mx-auto bg-white min-h-full">
+                    <ActiveFiltersDisplay />
+                    <div className="flex items-center gap-3 mb-6 border-b border-slate-200 pb-4 mt-2">
+                        <div className="w-12 h-12 bg-fuchsia-50 text-fuchsia-600 rounded-xl flex items-center justify-center shadow-inner"><Icon name="Target" size={24} /></div>
+                        <div><h3 className="text-xl font-black text-slate-800 tracking-tight">Resumo Executivo Gerado Automaticamente</h3><p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Leitura contextual dos filtros atuais</p></div>
+                    </div>
+                    <div className="space-y-4">
+                        <p className="text-sm leading-relaxed">Com base nos filtros aplicados, o faturamento gerado neste período ({timeMode}) foi de <strong>{formatCurrency(m.fatCur)}</strong>. O ticket médio das suas {m.capCur} lojas ativas fixou-se em <strong>{formatCurrency(m.ticketMedioCur)}</strong> por ponto de venda.</p>
+                        <p className="text-sm leading-relaxed">Olhando para o comportamento da carteira, a sua máquina de vendas trouxe <strong>{m.novosMain} clientes novos</strong> (injetando {formatCurrency(m.fatNovosMain)} em novas receitas). No entanto, o nível de atrito (Churn) resultou em <strong>{m.perdidosMain} clientes perdidos</strong>, representando uma lacuna de {formatCurrency(m.fatPerdidosMain)} face ao ciclo anterior.</p>
+                        <p className="text-sm leading-relaxed">A nível de concentração, o produto campeão de vendas que puxa este resultado é o <strong>{topProd}</strong>. Do lado dos clientes, o parceiro mais estratégico e que exige proteção imediata para sustentar este número é <strong>{topCli}</strong>.</p>
+                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mt-4 print-force-bg">
+                            <h4 className="text-amber-800 font-black text-xs uppercase flex items-center gap-1.5 mb-2"><Icon name="AlertCircle" size={14} /> Recomendação Tática</h4>
+                            <p className="text-amber-900 text-sm">Existe atualmente um grupo de <strong>{m.alertaMain} clientes</strong> em zona vermelha (atrasados nas suas recompras habituais). Recomenda-se exportar a lista em "Alerta" e atuar imediatamente para proteger a carteira.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (modalConfig.type === 'routing') {
+            return (
+                <div className="p-2 lg:p-4 space-y-2">
+                   <ActiveFiltersDisplay />
+                   <div className="bg-indigo-50 border border-indigo-100 p-2 lg:p-3 rounded-xl shadow-sm text-indigo-800 text-[9px] flex justify-between items-center mb-2 no-print">
+                       <span><strong>Dica:</strong> Estas rotas já respeitam os filtros globais ativos.</span>
+                       <button onClick={handleExportRoutes} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 font-bold shadow-sm"><Icon name="FileSpreadsheet" size={12}/> Exportar Excel</button>
+                   </div>
+                   {routingData.length === 0 ? (<p className="text-center text-slate-500 py-10 font-bold">Nenhuma rota sugerida com os filtros atuais.</p>) : routingData.map((rota, idx) => (
+                       <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                           <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
+                               <h4 className="text-[10px] font-black text-slate-800 flex items-center gap-1.5"><Icon name="MapPin" size={14} className="text-indigo-600"/>Rota {idx+1}: {rota.loc}</h4>
+                               <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[8px] font-black print-force-bg">{rota.clients.length} Clientes &bull; {formatCurrency(rota.fatTotal)}</span>
+                           </div>
+                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                               {rota.clients.slice(0,6).map((c, i) => (
+                                   <div key={i} className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg border border-slate-100 print-force-bg">
+                                        {renderClientCell(c)}
+                                        <div className="text-right shrink-0"><p className="text-[9px] font-black text-slate-800">{formatShortNum(c.fatCur)}</p><p className={`text-[8px] font-bold ${c.growth < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{c.growth > 0 ? '+' : ''}{Number(c.growth||0).toFixed(1)}%</p></div>
+                                   </div>
+                               ))}
+                           </div>
+                       </div>
+                   ))}
+                </div>
+            );
+        }
+
+        if (modalConfig.type === 'representatividade' && representatividadeDetails) {
+            if (representatividadeDetails.isOverview) return (<div className="flex flex-col items-center justify-center h-full p-10 text-center text-slate-500 min-h-[250px]"><Icon name="MapPin" size={24} className="mb-2 text-blue-400" /><h3 className="text-sm font-black text-slate-800 mb-1">Desbloqueie o Raio-X</h3><p className="max-w-md text-[9px]">Utilize o menu <strong>"Selecionar {pieChartMetric}"</strong> no topo.</p></div>);
+            const colsOpps = [ {label:'Rank', align:'text-center', val:r=><span className="text-slate-400"># {String(r.globalRank)}</span>}, {label:'Produto', val:r=><div><div className="font-bold text-slate-800">{String(r.name)}</div></div>}, {label:'Status', align:'text-center', val:r=><span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${r.actualFat===0?'bg-rose-100 text-rose-700':'bg-amber-100 text-amber-700'} print-force-bg`}>{String(r.status)}</span>}, {label:'Potencial', align:'text-right', val:r=><span className="text-emerald-600 font-black">+{formatCurrency(r.gap)}</span>} ];
+            const colsClients = [ {label:'Rank', align:'text-center', val:r=><span className="text-slate-400"># {String(r.rank)}</span>}, {label:'Cliente', val:r=>renderClientCell(r)}, {label:'Local', align:'text-center', val:r=><span className="text-[8px] font-bold text-slate-500">{String(r.city)}-{String(r.state)}</span>}, {label:'Fat. Atual', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r.fatCur)}</span>} ];
+            const cList = selectedOpportunity ? representatividadeDetails.clientList.filter(c => { const p = representatividadeDetails.clientProductMap.get(c.cKey); return !p || !p.has(selectedOpportunity); }) : representatividadeDetails.clientList;
+            return (
+                <div className="p-2 lg:p-4 space-y-2 flex flex-col h-full">
+                    <ActiveFiltersDisplay />
+                    <div className={`grid grid-cols-1 md:grid-cols-2 ${showWhiteSpace ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2 shrink-0`}>
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Fat. do Segmento</p><h3 className="text-lg font-black text-slate-800">{formatCurrency(representatividadeDetails.fatCur)}</h3></div>
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm"><p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Capilaridade</p><h3 className="text-lg font-black text-slate-800">{Number(representatividadeDetails.capilaridade).toLocaleString('pt-BR')}</h3></div>
+                        {showWhiteSpace && (<div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 shadow-sm print-force-bg"><p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5">White Space</p><h3 className="text-lg font-black text-emerald-700">+{formatCurrency(representatividadeDetails.totalGap)}</h3></div>)}
+                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center text-center print-force-bg"><div><h3 className="text-[8px] font-black text-slate-500 uppercase">{String(pieChartMetric)}</h3><p className="text-[10px] font-bold text-blue-600 mt-0.5 truncate max-w-[120px]">{String(modalRepFilter)}</p></div></div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 mt-2 h-[220px] min-h-[220px] shrink-0">
+                        <div className="flex flex-col h-full"><MiniBarChart data={representatividadeDetails.topProducts} color="#3b82f6" isFat={true} title="Top 10 Produtos" /></div>
+                        <div className="flex flex-col h-full"><MiniBarChart data={representatividadeDetails.topClients} color="#f59e0b" isFat={true} title="Top 10 Clientes" /></div>
+                    </div>
+                    {showWhiteSpace && (
+                        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-2 flex flex-col min-h-[200px] flex-1">
+                            <div className="p-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0 print-force-bg"><h4 className="text-[8px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5"><Icon name="Package" size={10} className="text-blue-600"/> Plano de Ação: Ofertas</h4><span className="text-[7px] font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200 no-print" data-html2canvas-ignore="true">Clique na linha</span></div>
+                            <div className="overflow-y-auto custom-scroll flex-1"><DataTable cols={colsOpps} data={representatividadeDetails.opportunities.slice(0, 50)} onRowClick={(r) => setSelectedOpportunity(r.name === selectedOpportunity ? null : r.name)} selectedRowValue={selectedOpportunity} rowKey="name" /></div>
+                        </div>
+                    )}
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-2 flex flex-col min-h-[200px] flex-1">
+                        <h4 className="text-[8px] font-black text-slate-800 uppercase tracking-wider p-2 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0 print-force-bg">
+                            <div className="flex items-center gap-1.5"><Icon name="Users" size={10} className="text-blue-600"/>{selectedOpportunity ? <span className="text-blue-700">Alvos para: <span className="bg-blue-100 px-1 py-0.5 rounded">{String(selectedOpportunity)}</span></span> : <span>Contatos Alvo</span>}</div>
+                        </h4>
+                        <div className="overflow-y-auto custom-scroll flex-1"><DataTable cols={colsClients} data={cList.slice(0, 50)} /></div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (modalConfig.type === 'abc' && abcDataRaw) {
+            const colsABC = [ 
+                {label:'Rank', align:'text-center', val:r=><span className="text-slate-400 font-bold">{"#" + String(r.rank)}</span>}, 
+                {label:abcDimension==='clientes'?'Cliente':'Produto', val:r=>(abcDimension==='clientes' ? renderClientCell(r) : <div className="text-slate-800 font-bold truncate max-w-[150px] md:max-w-[200px]">{String(r.name)}</div>)}, 
+                {label:'Faturamento', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r.amount)}</span>}, 
+                {label:'% Rep.', align:'text-right', val:r=><span className="text-slate-500 font-bold">{Number(r.pct || 0).toFixed(2) + "%"}</span>}, 
+                {label:'% Acum.', align:'text-right', val:r=><span className="text-fuchsia-600 font-bold">{Number(r.accPct || 0).toFixed(2) + "%"}</span>}, 
+                {label:'Curva', align:'text-center', val:r=><span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${r.curve==='A'?'bg-emerald-100 text-emerald-700':r.curve==='B'?'bg-blue-100 text-blue-700':'bg-slate-200 text-slate-600'} print-force-bg`}>Curva {String(r.curve)}</span>} 
+            ];
+            return (
+                <div className="p-2 lg:p-4 space-y-2 flex flex-col h-full">
+                    <ActiveFiltersDisplay />
+                    <div className="flex justify-center gap-1.5 mb-1 no-print shrink-0" data-html2canvas-ignore="true">
+                         <button onClick={() => { setAbcDimension('clientes'); setLocalModalSearch(''); }} className={`px-2 py-1 rounded-md font-black text-[9px] shadow-sm transition-all ${abcDimension === 'clientes' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Por Clientes</button>
+                         <button onClick={() => { setAbcDimension('produtos'); setLocalModalSearch(''); }} className={`px-2 py-1 rounded-md font-black text-[9px] shadow-sm transition-all ${abcDimension === 'produtos' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Por Produtos</button>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 shrink-0">
+                        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl shadow-sm print-force-bg"><h3 className="text-emerald-800 font-black text-[9px] border-b border-dashed border-emerald-300 w-fit pb-[1px]">Curva A (Top 80%)</h3><div className="mt-1 flex justify-between items-end"><div><p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5">Qtd.</p><p className="text-lg font-black text-emerald-800">{Number(abcDataRaw.countA)}</p></div><div className="text-right"><p className="text-[8px] font-black text-emerald-600 uppercase mb-0.5">Fat.</p><p className="text-lg font-black text-emerald-800">{formatShortNum(abcDataRaw.fatA)}</p></div></div></div>
+                        <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl shadow-sm print-force-bg"><h3 className="text-blue-800 font-black text-[9px] border-b border-dashed border-blue-300 w-fit pb-[1px]">Curva B (Próx. 15%)</h3><div className="mt-1 flex justify-between items-end"><div><p className="text-[8px] font-black text-blue-600 uppercase mb-0.5">Qtd.</p><p className="text-lg font-black text-blue-800">{Number(abcDataRaw.countB)}</p></div><div className="text-right"><p className="text-[8px] font-black text-blue-600 uppercase mb-0.5">Fat.</p><p className="text-lg font-black text-emerald-800">{formatShortNum(abcDataRaw.fatB)}</p></div></div></div>
+                        <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm"><h3 className="text-slate-700 font-black text-[9px] border-b border-dashed border-slate-300 w-fit pb-[1px]">Curva C (Últ. 5%)</h3><div className="mt-1 flex justify-between items-end"><div><p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Qtd.</p><p className="text-lg font-black text-slate-700">{Number(abcDataRaw.countC)}</p></div><div className="text-right"><p className="text-[8px] font-black text-slate-400 uppercase mb-0.5">Fat.</p><p className="text-lg font-black text-slate-700">{formatShortNum(abcDataRaw.fatC)}</p></div></div></div>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-2 h-[220px] min-h-[220px] shrink-0 flex flex-col">
+                        <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-wider mb-1.5 shrink-0">Gráfico de Pareto</h4>
+                        <div className="flex-1 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={abcDataRaw.list.slice(0, 50)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <YAxis yAxisId="left" tickFormatter={v=>`${(v/1000000).toFixed(1)}M`} tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} axisLine={false} tickLine={false} width={30} />
+                                    <YAxis yAxisId="right" orientation="right" tickFormatter={v=>`${v}%`} tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} axisLine={false} tickLine={false} domain={[0, 100]} width={25} />
+                                    <Tooltip content={<CustomAbcTooltip />} />
+                                    <Bar yAxisId="left" dataKey="amount" radius={[2, 2, 0, 0]}>
+                                        {abcDataRaw.list.slice(0, 50).map((e, i) => <Cell key={"cell-" + i} fill={e.curve === 'A' ? '#10b981' : e.curve === 'B' ? '#3b82f6' : '#cbd5e1'} />)}
+                                    </Bar>
+                                    <Line yAxisId="right" type="monotone" dataKey="accPct" stroke="#f97316" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-[200px]">
+                        <div className="flex-1 overflow-y-auto custom-scroll"><DataTable cols={colsABC} data={filteredAbcList} /></div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (modalConfig.type === 'matriz') {
+            const colsMatriz = [ 
+                {label:'Rank', align:'text-center', val:r=><span className="text-slate-400 font-bold">{"#" + String(r.rank)}</span>}, 
+                {label:'Nome', sort:()=>setMatrizSortConfig(p=>({column:'name',direction:p.column==='name'&&p.direction==='desc'?'asc':'desc'})), activeSort:matrizSortConfig.column==='name', sortDir:matrizSortConfig.direction, val:r=>(scatterMetric==='clientes'?renderClientCell(r):<div className="text-slate-800 font-bold truncate max-w-[200px]">{String(r.name)}</div>)}, 
+                {label:'Fat. Atual', align:'text-right', sort:()=>setMatrizSortConfig(p=>({column:'fatCur',direction:p.column==='fatCur'&&p.direction==='desc'?'asc':'desc'})), activeSort:matrizSortConfig.column==='fatCur', sortDir:matrizSortConfig.direction, val:r=><span className="font-bold text-slate-800">{formatCurrency(r.fatCur)}</span>}, 
+                {label:'Cresc.', align:'text-right', sort:()=>setMatrizSortConfig(p=>({column:'growth',direction:p.column==='growth'&&p.direction==='desc'?'asc':'desc'})), activeSort:matrizSortConfig.column==='growth', sortDir:matrizSortConfig.direction, val:r=><span className={`px-1.5 py-0.5 rounded font-bold text-[8px] ${r.growth>=0?'bg-emerald-50 text-emerald-600':'bg-rose-50 text-rose-600'} print-force-bg`}>{r.growth>0?'+':''}{Number(r.growth || 0).toFixed(1) + "%"}</span>}, 
+                {label:'Quadrante', align:'text-center', sort:()=>setMatrizSortConfig(p=>({column:'quadrant',direction:p.column==='quadrant'&&p.direction==='desc'?'asc':'desc'})), activeSort:matrizSortConfig.column==='quadrant', sortDir:matrizSortConfig.direction, val:r=><span className={`px-2 py-0.5 rounded text-[8px] font-black ${r.bg} ${r.color} print-force-bg`}>{String(r.quadrant)}</span>} 
+            ];
+            const mS = { E: { l: 'Estrelas', c: 0, f: 0, col: 'text-emerald-600', bg: 'bg-emerald-50', bd: 'border-emerald-200' }, V: { l: 'Vacas Leiteiras', c: 0, f: 0, col: 'text-blue-600', bg: 'bg-blue-50', bd: 'border-blue-200' }, Ap: { l: 'Apostas', c: 0, f: 0, col: 'text-amber-600', bg: 'bg-amber-50', bd: 'border-amber-200' }, Ab: { l: 'Abacaxis', c: 0, f: 0, col: 'text-rose-600', bg: 'bg-rose-50', bd: 'border-rose-200' } };
+            let tF = 0; scatterPlotData.filtered.forEach(d => { let k = ''; if(d.quadrant === 'Estrela') k='E'; else if(d.quadrant === 'Vaca Leiteira') k='V'; else if(d.quadrant === 'Aposta') k='Ap'; else k='Ab'; mS[k].c++; mS[k].f += d.fatCur; tF += d.fatCur; });
+            return (
+                <div className="p-2 lg:p-4 space-y-2 flex flex-col h-full">
+                    <ActiveFiltersDisplay />
+                    {modalInsight && <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 p-2 rounded-lg text-[9px] font-bold shadow-sm flex items-center gap-1.5 shrink-0 print-force-bg"><Icon name="Target" size={12}/> {modalInsight}</div>}
+                    {!scatterPlotData.hasHistory ? (
+                        <div className="flex items-center justify-center h-full w-full bg-slate-50 rounded-xl border border-slate-200 border-dashed p-10 text-center"><p className="text-sm font-bold text-slate-500">O seu período selecionado não possui dados históricos anteriores suficientes para calcular o crescimento (Eixo X). A Matriz BCG requer histórico.</p></div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 shrink-0">
+                                {Object.values(mS).map((s, i) => (
+                                    <div key={i} className={`${s.bg} p-3 rounded-xl border ${s.bd} shadow-sm print-force-bg`}><h3 className={`text-[8px] font-black uppercase ${s.col}`}>{String(s.l)}</h3><div className="mt-1.5 flex justify-between items-end"><div><p className={`text-[7px] font-black opacity-70 ${s.col}`}>TOTAL</p><p className={`text-lg font-black ${s.col}`}>{Number(s.c)}</p></div><div className="text-right"><p className={`text-[7px] font-black opacity-70 ${s.col}`}>FAT.</p><p className={`text-sm font-black ${s.col}`}>{formatShortNum(s.f)}</p></div></div><p className={`text-[7px] font-bold mt-1 opacity-80 ${s.col}`}>{(tF > 0 ? (s.f/tF)*100 : 0).toFixed(1)}% da matriz</p></div>
+                                ))}
+                            </div>
+                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-[300px]">
+                                <div className="flex-1 overflow-y-auto custom-scroll"><DataTable cols={colsMatriz} data={scatterPlotData.filtered.slice(0, 200)} footer={<tr><td colSpan="5" className="py-2 text-center text-[8px] font-bold text-slate-500">Exibindo os primeiros {Math.min(200, scatterPlotData.filtered.length)} itens na tela.</td></tr>} /></div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        }
+
+        if (['distribuidores', 'produtos', 'top'].includes(modalConfig.type)) {
+            if (detailedEntityData) {
+                const d = detailedEntityData; const isF = modalEvolucaoMode === 'faturamento';
+                const mV = isF ? formatCurrency(d.curTotal) : (Number(d.curQtyTotal || 0).toLocaleString('pt-BR') + " un"); const mG = isF ? d.growth : d.growthQty; const sV = isF ? (Number(d.curQtyTotal || 0).toLocaleString('pt-BR') + " un") : formatCurrency(d.curTotal); const sG = isF ? d.growthQty : d.growth;
+                const rB = d.isAll ? <span className="bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded text-[8px] font-black shrink-0 print-force-bg">TOTAL</span> : getRankBadge(d.rank);
+                const cards = modalConfig.type === 'produtos' ? [
+                    { t1: isF ? 'Receita Atual' : 'Volume Atual', v1: mV, g1: mG, b: rB }, { t1: isF ? 'Volume Atual' : 'Receita Atual', v1: sV, g1: sG }, { t1: 'Preço Médio vs Último', v1: "R$ " + Number(d.avgPrice || 0).toFixed(2), s: "Último: R$ " + Number(d.lastPrice || 0).toFixed(2) }
+                ] : modalConfig.type === 'top' ? [
+                    { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: mV, g1: mG, b: rB }, { t1: isF ? 'Volume Atual' : 'Faturamento Atual', v1: sV, g1: sG }, { t1: 'Média Mensal', v1: isF ? formatCurrency(d.curTotal / (yearComparisonData?.curSpan || 12)) : (Math.round(d.curQtyTotal / (yearComparisonData?.curSpan || 12)).toLocaleString('pt-BR') + " un"), s: "/ " + Number(yearComparisonData?.curSpan || 12) + " meses" }
+                ] : [
+                    { t1: isF ? 'Faturamento Atual' : 'Volume Atual', v1: mV, g1: mG, b: rB }, { t1: 'Capilaridade', v1: Number(d.capilaridade || 0).toLocaleString('pt-BR') + " PDVs", s: 'Neste ciclo' }, { t1: 'Média / PDV', v1: d.capilaridade > 0 ? (isF ? formatCurrency(d.curTotal / d.capilaridade) : ((d.curQtyTotal / d.capilaridade).toFixed(1) + " un")) : (isF ? 'R$ 0,00' : '0 un'), s: 'Ticket/Volume Médio' }
+                ];
+                
+                const colsProd = [
+                    {label:'Rank', align:'text-center', val: r => <span className="text-slate-400 font-bold">#{r.rank}</span>},
+                    {label:'Produto', val: r => <span className="font-bold text-slate-700 truncate max-w-[180px]" title={r.name}>{r.name}</span>},
+                    {label:'Faturamento', align:'text-right', val: r => <span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>},
+                    {label:'Qtd', align:'text-right', val: r => <span className="text-slate-600 font-bold">{Number(r.qty).toLocaleString('pt-BR')}</span>},
+                    {label:'Preço Méd.', align:'text-right', val: r => <span className="font-bold text-blue-600">{r.qty > 0 ? formatCurrency(r.valor / r.qty) : '-'}</span>},
+                    {label:'Mix %', align:'text-right', val: r => <span className="font-bold text-indigo-600">{Number(((r.valor / (d.curTotal || 1)) * 100) || 0).toFixed(1)}%</span>}
+                ];
+                const colsDist = [
+                    {label:'Rank', align:'text-center', val: r => <span className="text-slate-400 font-bold">#{r.rank}</span>},
+                    {label:'Distribuidor', val: r => <span className="font-bold text-slate-700 truncate max-w-[180px]" title={r.name}>{r.name}</span>},
+                    {label:'Faturamento', align:'text-right', val: r => <span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>},
+                    {label:'Qtd', align:'text-right', val: r => <span className="text-slate-600 font-bold">{Number(r.qty).toLocaleString('pt-BR')}</span>},
+                    {label:'Preço Méd.', align:'text-right', val: r => <span className="font-bold text-blue-600">{r.qty > 0 ? formatCurrency(r.valor / r.qty) : '-'}</span>},
+                    {label:'Repres. %', align:'text-right', val: r => <span className="font-bold text-emerald-600">{Number(((r.valor / (d.curTotal || 1)) * 100) || 0).toFixed(1)}%</span>}
+                ];
+                const colsCli = [
+                    {label:'Rank', align:'text-center', val: r => <span className="text-slate-400 font-bold">#{r.rank}</span>},
+                    {label:'Cliente', val: r => renderClientCell(r)},
+                    {label:'Local', align:'text-center', val: r => <span className="text-[8px] font-bold text-slate-500">{String(r.city || '')}-{String(r.state || '')}</span>},
+                    {label:'Faturamento', align:'text-right', val: r => <span className="font-bold text-slate-800">{formatCurrency(r.valor)}</span>},
+                    {label:'Qtd', align:'text-right', val: r => <span className="text-slate-600 font-bold">{Number(r.qty).toLocaleString('pt-BR')}</span>},
+                    {label:'Preço Méd.', align:'text-right', val: r => <span className="font-bold text-blue-600">{r.qty > 0 ? formatCurrency(r.valor / r.qty) : '-'}</span>},
+                    {label:'Part. %', align:'text-right', val: r => <span className="font-bold text-fuchsia-600">{Number(((r.valor / (d.curTotal || 1)) * 100) || 0).toFixed(1)}%</span>}
+                ];
+
+                let bD = [], bT = '', bC = '', tD = [], tT = '', tI = '', tC = [], tL = 50;
+                
+                if (modalConfig.type === 'top') {
+                    bD = isF ? d.topProductsFat : d.topProductsQty; bT = d.isAll ? 'Top 5 Produtos da Carteira' : 'Top 5 Produtos Comprados'; bC = '#10b981';
+                } else if (modalConfig.type === 'produtos') {
+                    bD = isF ? d.topDistributorsFat : d.topDistributorsQty; bT = d.isAll ? 'Distribuidores que Mais Vendem' : 'Onde é Vendido'; bC = '#3b82f6';
+                } else {
+                    bD = isF ? d.topProductsFat : d.topProductsQty; bT = d.isAll ? 'Top 5 Produtos' : 'Top 5 Produtos Vendidos'; bC = '#f59e0b';
+                }
+
+                let rawList = [];
+                if (modalConfig.type === 'top') {
+                    if (d.isAll) { rawList = globalMetrics.allClientsRanked.map(c => ({...c, valor: c.fatCur, qty: c.qtyCur})); tT = 'Todos os Clientes Ativos'; tI = 'Users'; tC = colsCli; } 
+                    else { rawList = isF ? d.topDistributorsFat : d.topDistributorsQty; tT = 'Onde o Cliente Compra'; tI = 'Truck'; tC = colsDist; }
+                } else if (modalConfig.type === 'distribuidores') {
+                    if (d.isAll) { rawList = fullRankedDistributors.map(r => ({...r, valor: r.curVal, qty: r.qtyCur})); tT = 'Ranking Geral de Distribuidores'; tI = 'Truck'; tC = colsDist; } 
+                    else { rawList = isF ? d.topClientsFat : d.topClientsQty; tT = 'Principais Clientes Atendidos por este Distribuidor'; tI = 'Users'; tC = colsCli; }
+                } else if (modalConfig.type === 'produtos') {
+                    if (d.isAll) { rawList = fullRankedProducts.map(p => ({...p, valor: p.curVal, qty: p.qtyCur})); tT = 'Ranking Geral de Venda de Produtos'; tI = 'Package'; tC = colsProd; } 
+                    else { rawList = isF ? d.topClientsFat : d.topClientsQty; tT = 'Principais Clientes Compradores deste Produto'; tI = 'Users'; tC = colsCli; }
+                }
+
+                if (localModalSearch) {
+                    const term = removeAccents(localModalSearch).toLowerCase().trim();
+                    rawList = rawList.filter(item => 
+                        removeAccents(String(item.name || '')).toLowerCase().includes(term) ||
+                        removeAccents(String(item.cnpj || '')).toLowerCase().includes(term) ||
+                        removeAccents(String(item.city || '')).toLowerCase().includes(term)
+                    );
+                }
+
+                const tableDataToRender = rawList.map((item, idx) => ({ ...item, rank: idx + 1 }));
+
+                return (
+                    <div className="p-2 lg:p-3 flex flex-col gap-2 h-full">
+                        <ActiveFiltersDisplay />
+                        {modalInsight && <div className="bg-blue-50 border border-blue-200 text-blue-800 p-2 rounded-lg text-[9px] font-bold shadow-sm flex items-center gap-1.5 shrink-0 print-force-bg"><Icon name="Target" size={12}/> {modalInsight}</div>}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 shrink-0">
+                            {cards.map((x,i) => (<div key={i} className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200"><div className="flex justify-between items-start"><p className="text-[7px] font-black text-slate-400 uppercase">{String(x.t1)}</p>{x.b}</div><h3 className="text-lg font-black mt-1 text-blue-600">{String(x.v1)}</h3>{x.g1 !== undefined ? (<div className="mt-1"><span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${x.g1>0?'bg-emerald-50 text-emerald-600':x.g1<0?'bg-rose-50 text-rose-600':'bg-slate-50 text-slate-500'} print-force-bg`}>{x.g1>0?'+':''}{Number(x.g1 || 0).toFixed(1)}% vs Ant.</span></div>) : (<p className="text-[8px] text-slate-400 font-bold mt-1">{String(x.s)}</p>)}</div>))}
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 h-[220px] min-h-[220px] max-h-[220px] shrink-0">
+                            <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex flex-col h-full relative"><MiniLineChart data={d.monthlyTrend} isFat={isF} setMode={setModalEvolucaoMode}/></div>
+                            <div className="flex flex-col h-full relative"><MiniBarChart data={bD.slice(0, 5)} color={bC} isFat={isF} title={bT}/></div>
+                        </div>
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-[200px]">
+                            <h4 className="text-[8px] font-black text-slate-800 uppercase p-2 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 shrink-0 print-force-bg"><Icon name={tI} size={12} className="text-blue-600"/> {tT}</h4>
+                            <div className="overflow-y-auto custom-scroll flex-1 min-h-0"><DataTable cols={tC} data={tableDataToRender} /></div>
+                        </div>
+                    </div>
+                );
+            }
+        }
+
+        if (modalConfig.type === 'analitico') {
+            const colsAn = [ {label:'Data', val:r=><span className="font-bold text-slate-800">{String(r._displayDate)}</span>, sort:()=>setAnaliticoSortConfig(p=>({column:'data',direction:p.column==='data'&&p.direction==='desc'?'asc':'desc'})), activeSort:analiticoSortConfig.column==='data', sortDir:analiticoSortConfig.direction}, {label:'Cliente', val:r=>renderClientCell(r)}, {label:'UF', align:'text-center', val:r=><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[7px] font-bold">{String(r._state)}</span>}, {label:'Cidade', val:r=>String(r._city)}, {label:'Distribuidor', val:r=><div className="font-bold text-slate-700 truncate max-w-[100px]">{String(r._distributor)}</div>}, {label:'Produto', val:r=><div className="font-bold text-slate-700 truncate max-w-[100px]">{String(r._product)}</div>}, {label:'Qtd', align:'text-right', val:r=><span className="font-bold text-slate-800">{Number(r._qty)}</span>}, {label:'Fat.', align:'text-right', val:r=><span className="font-bold text-slate-800">{formatCurrency(r._amount)}</span>, sort:()=>setAnaliticoSortConfig(p=>({column:'faturamento',direction:p.column==='faturamento'&&p.direction==='desc'?'asc':'desc'})), activeSort:analiticoSortConfig.column==='faturamento', sortDir:analiticoSortConfig.direction}, {label:'Preço Unit.', align:'text-right', val:r=><span className="font-bold text-blue-600">{r._qty>0?formatCurrency(r._amount/r._qty):'-'}</span>} ];
+            return (
+                <div className="p-2 lg:p-4 h-full flex flex-col">
+                    <ActiveFiltersDisplay />
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1">
+                        <div className="overflow-y-auto custom-scroll flex-1"><DataTable cols={colsAn} data={modalDataFiltered.slice(0, 500)} footer={<tr className="text-[8px] font-black text-slate-800 uppercase tracking-wider border-t border-slate-200 bg-slate-100 print-force-bg"><td colSpan="6" className="py-2 px-3 text-right">TOTAL DA SELEÇÃO ATUAL:</td><td className="py-2 px-3 text-right">{totalAnaliticoQtd.toLocaleString('pt-BR')} un</td><td className="py-2 px-3 text-right text-emerald-600">{formatCurrency(totalAnaliticoFat)}</td><td className="py-2 px-3 text-right text-blue-600">{formatCurrency(precoMedioAnalitico)}</td></tr>} /></div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (modalConfig.type === 'preco') {
+            const colsPr = [ {label:'Produto', val:r=><div className="font-bold text-slate-800 truncate max-w-[200px]">{String(r.name)}</div>}, {label:'Qtd', align:'text-right', val:r=><span className="font-bold text-slate-800">{Number(r.qty).toLocaleString('pt-BR')} un</span>}, {label:'Menor Preço', align:'text-right', val:r=><div><div className="text-emerald-600 font-black">{formatCurrency(r.min)}</div></div>}, {label:'Preço Médio', align:'text-right', val:r=><span className="text-blue-700 font-black bg-blue-50/50 px-1.5 py-0.5 rounded print-force-bg">{formatCurrency(r.avg)}</span>}, {label:'Último Preço', align:'text-right', val:r=><div><div className="text-slate-800 font-black">{formatCurrency(r.lastPrice)}</div></div>} ];
+            return <div className="p-2 lg:p-4 flex flex-col h-full"><ActiveFiltersDisplay /><div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col"><div className="overflow-y-auto custom-scroll flex-1"><DataTable cols={colsPr} data={modalProdutosData} /></div></div></div>;
+        }
+
+        if (modalConfig.type === 'capilaridade') {
+            return (
+                <div className="p-3 h-full min-h-[300px] min-w-[500px]">
+                    <ActiveFiltersDisplay />
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartDataCapilaridade} margin={{top:5, right:15, left:5, bottom:0}}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize:9, fontWeight:600, fill:'#94a3b8'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fontSize:9, fontWeight:600, fill:'#94a3b8'}} width={35} />
+                            <Tooltip formatter={(v, n) => [Number(v||0).toLocaleString('pt-BR') + " PDVs", "Período"]} />
+                            <Line type="monotone" dataKey="Total" name="Total Ativos (PDVs)" stroke="#0f172a" strokeWidth={3} dot={{r:3}} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            );
+        }
+
+        const isA = modalConfig.type === 'alerta'; const isP = modalConfig.type === 'perdidos';
+        const colsFB = [ {label:'Cliente', val:r=>renderClientCell(r)}, {label:'Local', align:'text-center', val:r=><span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[7px] font-bold">{String(r.state)}</span>}, ...(isA ? [{label:'Média Mensal', align:'text-right', val:r=><span className="font-bold text-slate-500">{formatCurrency(r.mediaMensal)}/mês</span>}, {label:'Status', align:'text-center', val:r=><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[8px] font-black print-force-bg">{String(r.atraso)} meses s/ compra</span>}] : []), {label:'Fat. Atual', align:'text-right', val:r=><span className={`font-bold ${isP?'text-slate-400':'text-slate-800'}`}>{formatCurrency(r.fatCur)}</span>}, ...(isP || isA ? [{label:'Fat. Ant.', align:'text-right', val:r=><span className="text-rose-600 font-bold">{formatCurrency(r.fatComp)}</span>}] : []) ];
+        return (
+            <div className="p-2 lg:p-4 h-full flex flex-col">
+                <ActiveFiltersDisplay />
+                {modalInsight && <div className="bg-rose-50 border border-rose-200 text-rose-800 p-2 rounded-lg text-[9px] font-bold shadow-sm mb-2 flex items-center gap-1.5 shrink-0 print-force-bg"><Icon name="AlertCircle" size={12}/> {modalInsight}</div>}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1"><div className="overflow-y-auto custom-scroll flex-1"><DataTable cols={colsFB} data={filteredModalDataList.slice(0, 100)} footer={<tr className="text-[8px] font-black text-slate-800 uppercase border-t border-slate-200 bg-slate-50 print-force-bg"><td colSpan={isA?3:2} className="py-2 px-3 text-right">{isP ? 'Total Perdido:' : 'Total Atual:'}</td><td className={`py-2 px-3 text-right text-[10px] font-bold ${isP?'text-slate-400':'text-emerald-600'}`}>{formatCurrency(totalModalFatCur)}</td>{(isP||isA) && <td className="py-2 px-3 text-right text-[10px] font-bold text-rose-600">{formatCurrency(totalModalFatComp)}</td>}</tr>} /></div></div>
+            </div>
+        );
+    };
+
+    if (isLoadingAuto) return (<div className="min-h-screen flex flex-col items-center justify-center bg-slate-100"><Icon name="Loader2" size={32} className="text-blue-600 animate-spin mb-4" /><h2 className="text-lg font-black text-slate-700">A processar...</h2></div>);
+
+    if (!isLoaded || showUploadScreen) return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+            <div className="bg-white p-5 rounded-2xl shadow-xl text-center max-w-sm w-full border border-slate-200">
+                {errorMsg && (<div className="mb-3 flex items-start gap-1.5 text-left bg-rose-50 p-2 rounded-lg text-rose-700 font-bold text-[9px]"><Icon name="AlertCircle" size={16} className="shrink-0" />{errorMsg}</div>)}
+                {!isAdminVerified ? (
+                    <><div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-inner"><Icon name="Users" size={20} /></div><h2 className="text-base font-black text-slate-800 mb-0.5">Acesso Restrito</h2><p className="text-[9px] text-slate-500 mb-4 font-semibold">Introduza a sua credencial para continuar</p><input type="password" placeholder="Sua credencial..." value={passwordValue} onChange={e => setPasswordValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && verifyPassword()} className={`w-full px-3 py-2 rounded-xl border text-center text-xs font-bold mb-3 bg-slate-50 focus:ring-2 outline-none transition-all ${passwordError ? 'border-rose-500 focus:ring-rose-200' : 'border-slate-200 focus:ring-blue-500'}`} />{passwordError && <p className="text-[9px] font-bold text-rose-500 mb-2">Credencial inválida. Tente novamente.</p>}<button onClick={verifyPassword} className="w-full bg-blue-600 text-white font-black text-[10px] py-2.5 rounded-xl hover:bg-blue-700 transition-colors shadow-md">Entrar no Dashboard</button></>
+                ) : (
+                    <><div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-inner"><Icon name="Upload" size={20} /></div><h2 className="text-base font-black text-slate-800 mb-0.5">Olá, {String(currentUser?.nome?.split(' ')[0] || '')}!</h2><p className="text-[9px] text-slate-500 mb-4 font-semibold">Por favor, carregue a base de dados (.csv).</p><label className="block w-full cursor-pointer bg-slate-900 text-white font-black text-[10px] py-2.5 rounded-xl hover:bg-black transition-colors shadow-md">Selecionar Base CSV<input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" /></label></>
+                )}
+            </div>
+        </div>
+    );
+
+    return (
+        <div id="main-dashboard-export-area" className="max-w-[1500px] mx-auto p-1 lg:p-2 text-slate-900 flex flex-col gap-1.5 relative bg-slate-50">
+            {toastMessage && (<div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-slate-900 text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 text-[10px] font-black animate-bounce no-print" data-html2canvas-ignore="true"><Icon name="AlertCircle" size={14} className="text-blue-400" />{toastMessage}</div>)}
+            {modalConfig.isOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 no-print" data-html2canvas-ignore="true">
+                    <div id="modal-export-area" className="bg-white rounded-2xl w-full max-w-5xl flex flex-col shadow-2xl overflow-hidden" style={{maxHeight: '94vh', height: '94vh'}}>
+                        <div className="p-2 lg:p-3 border-b border-slate-100 flex flex-col bg-slate-50 gap-1.5 shrink-0">
+                            <div className="flex justify-between items-start md:items-center w-full flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-inner ${['novos','distribuidores'].includes(modalConfig.type)?'text-emerald-600 bg-emerald-100':['perdidos'].includes(modalConfig.type)?'text-rose-600 bg-rose-100':['top'].includes(modalConfig.type)?'text-fuchsia-600 bg-fuchsia-100':['alerta'].includes(modalConfig.type)?'text-amber-600 bg-amber-100':['preco','produtos','matriz','representatividade'].includes(modalConfig.type)?'text-blue-600 bg-blue-100':['abc','routing','manual'].includes(modalConfig.type)?'text-indigo-600 bg-indigo-100':'text-slate-600 bg-slate-100'}`}><Icon name={IconName} size={16}/></div>
+                                    <div><h2 className="text-base font-black text-slate-800 leading-tight">{modalTitle}</h2><p className="text-[8px] font-bold text-slate-500 mt-0.5">{modalDesc}</p></div>
+                                </div>
+                                <div className="flex items-end gap-1.5 flex-wrap">
+                                    {['distribuidores','produtos','top'].includes(modalConfig.type) && (
+                                        <div className="flex flex-col gap-0.5 min-w-[150px]">
+                                            <CustomSelect label={ modalConfig.type==='distribuidores'?'Distribuidor':modalConfig.type==='produtos'?'Produto':'Cliente' } options={ modalConfig.type==='distribuidores'?availableModalDistribuidores:modalConfig.type==='produtos'?availableModalProdutos:availableModalClientes } selected={ modalConfig.type==='distribuidores'?modalDistributorFilter:modalConfig.type==='produtos'?modalProductFilter:modalClientFilter } onChange={v=>{ if(modalConfig.type==='distribuidores')setModalDistributorFilter(v); else if(modalConfig.type==='produtos')setModalProductFilter(v); else if(modalConfig.type==='top')setModalClientFilter(v); }} placeholder="Pesquisar..." searchable={true} />
+                                        </div>
+                                    )}
+                                    {modalConfig.type === 'representatividade' && (
+                                        <div className="flex flex-col gap-0.5 min-w-[150px]">
+                                            <CustomSelect label={`Selecionar ${pieChartMetric}`} options={representatividadeDetails?.options || []} selected={modalRepFilter} onChange={(v)=>{setModalRepFilter(v); setSelectedOpportunity(null);}} placeholder="Pesquisar..." searchable={true} />
+                                        </div>
+                                    )}
+                                    {!['routing', 'assistente', 'manual'].includes(modalConfig.type) && (
+                                        <div className="min-w-[120px]">
+                                            <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Busca na Tabela</label>
+                                            <DebouncedInput value={localModalSearch} onChange={setLocalModalSearch} placeholder="Filtrar tabela..." icon="Search"/>
+                                        </div>
+                                    )}
+                                    <div className="flex items-end gap-1 h-[26px]">
+                                        {getModalBadge() && <div className="flex items-center h-full px-2 bg-blue-50 text-blue-700 rounded-md border border-blue-100 text-[9px] font-bold shadow-sm">{String(getModalBadge())}</div>}
+                                        {modalConfig.type === 'representatividade' && representatividadeDetails && !representatividadeDetails.isOverview && showWhiteSpace && (<div className="flex items-center h-full px-2 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-100 text-[9px] font-bold shadow-sm">Gap: +{formatCurrency(representatividadeDetails.totalGap)}</div>)}
+                                        {!['manual','routing','assistente'].includes(modalConfig.type) && (<button onClick={handleExportModalExcelData} className="h-full px-2 bg-emerald-50 text-emerald-700 rounded-md flex items-center justify-center hover:bg-emerald-100 text-[9px] font-bold gap-1 shadow-sm border border-emerald-100 ml-0.5"><Icon name="FileSpreadsheet" size={10}/> Excel</button>)}
+                                        <button onClick={()=>setModalConfig({isOpen:false, type:null})} className="w-[26px] h-full bg-white border border-slate-200 rounded-md flex items-center justify-center hover:text-rose-500 shadow-sm ml-0.5"><Icon name="X" size={12}/></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-0 overflow-y-auto modal-scroll flex-1 bg-slate-50/50 flex flex-col">{renderModalBody()}</div>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-white p-2.5 lg:p-3 rounded-2xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 shadow-sm no-print">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shadow-sm shrink-0">
+                        <img id="youyou-img" src="youyou.png" alt="You You" className="w-8 h-8 object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
+                        <Icon name="TrendingUp" size={16} className="text-blue-600 hidden" />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-1 mb-0.5"><div className="w-1.5 h-3 bg-blue-600 rounded-full"></div><h1 className="text-base lg:text-lg font-black tracking-tight text-slate-800 uppercase leading-none whitespace-nowrap">PERFORMANCE COMERCIAL</h1></div>
+                        <p className="text-slate-400 text-[8px] font-bold uppercase tracking-[0.1em] ml-2">Dashboard Sellout {currentUser && <span className="text-blue-500 font-black normal-case tracking-normal ml-0.5">&bull; {String(currentUser.nome.split(' ')[0])}</span>}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button onClick={()=>setTimeMode('U6M')} className={`px-2 py-1 text-[8px] uppercase tracking-wider font-black rounded transition-all ${timeMode==='U6M'?'bg-white shadow-sm text-blue-700':'text-slate-500 hover:text-slate-700'}`}>U6M</button>
+                    <button onClick={()=>setTimeMode('UDM')} className={`px-2 py-1 text-[8px] uppercase tracking-wider font-black rounded transition-all ${timeMode==='UDM'?'bg-white shadow-sm text-blue-700':'text-slate-500 hover:text-slate-700'}`}>UDM</button>
+                    <button onClick={()=>setTimeMode('YTD')} className={`px-2 py-1 text-[8px] uppercase tracking-wider font-black rounded transition-all ${timeMode==='YTD'?'bg-white shadow-sm text-blue-700':'text-slate-500 hover:text-slate-700'}`}>YTD</button>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap" data-html2canvas-ignore="true">
+                    {lastUpdate && <div className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg flex items-center gap-1"><Icon name="Clock" size={10} className="text-slate-400" /> <span className="text-slate-700">{String(lastUpdate)}</span></div>}
+                    <button onClick={()=>openModal('assistente')} className="flex items-center gap-1 bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-fuchsia-100 shadow-sm"><Icon name="Target" size={10}/> Analista Virtual</button>
+                    <button onClick={()=>openModal('routing')} className="flex items-center gap-1 bg-indigo-600 text-white border border-indigo-700 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-indigo-700 shadow-sm"><Icon name="MapPin" size={10}/> Rotas</button>
+                    <button onClick={()=>openModal('manual')} className="flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-blue-100 shadow-sm"><Icon name="BookOpen" size={10}/> Manual</button>
+                    <button onClick={handleExportPDF} className="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-rose-100 shadow-sm"><Icon name="Download" size={10}/> PDF</button>
+                    <button onClick={()=>openModal('abc')} className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-indigo-100 shadow-sm"><Icon name="Target" size={10}/> ABC</button>
+                    <button onClick={()=>openModal('analitico')} className="flex items-center gap-1 bg-white text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-slate-50 shadow-sm"><Icon name="List" size={10}/> Dados</button>
+                    <button onClick={()=>{setShowUploadScreen(true);setIsLoaded(false);}} className="flex items-center gap-1 bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-black shadow-sm"><Icon name="Upload" size={10}/> CSV</button>
+                    <button onClick={()=>{setShowUploadScreen(true);setIsLoaded(false);setCurrentUser(null);setPasswordValue('');setIsAdminVerified(false);}} className="flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-[9px] font-bold hover:bg-rose-100 shadow-sm"><Icon name="UserMinus" size={10}/> Sair</button>
+                </div>
+            </div>
+
+            <InsightsBar metrics={globalMetrics} />
+
+            <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-1.5 items-end no-print">
+                <div className="flex-1 min-w-[100px]"><DebouncedInput value={filters.searchCustomer} onChange={v => setFilters({...filters, searchCustomer: v})} placeholder="Cliente/CNPJ..." icon="Search" /></div>
+                <div className="flex-1 min-w-[100px]"><DebouncedInput value={filters.searchProduct} onChange={v => setFilters({...filters, searchProduct: v})} placeholder="Produto..." icon="Package" /></div>
+                <CustomMultiSelect label="Anos" options={availableOptions.years} selected={filters.years} onChange={v => setFilters({...filters, years: v})} placeholder="Todos" searchable={true} />
+                <CustomMultiSelect label="Meses" options={availableOptions.months} selected={filters.months} onChange={v => setFilters({...filters, months: v})} placeholder="Todos" searchable={true} />
+                <CustomMultiSelect label="Estado" options={availableOptions.states} selected={filters.state} onChange={v => setFilters({...filters, state: v})} placeholder="Todos" searchable={true} />
+                <CustomMultiSelect label="Cidade" options={availableOptions.cities} selected={filters.city} onChange={v => setFilters({...filters, city: v})} placeholder="Todas" searchable={true} />
+                <CustomMultiSelect label="Distribuidor" options={availableOptions.distributors} selected={filters.distributor} onChange={v => setFilters({...filters, distributor: v})} placeholder="Todos" searchable={true} />
+                <CustomMultiSelect label="Tipo" options={availableOptions.customerTypes} selected={filters.customerType} onChange={v => setFilters({...filters, customerType: v})} placeholder="Todos" searchable={true} />
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-1.5">
+                <KPICard title="Faturamento" metricKey="fatCur" growthKey="fatGrowth" icon="TrendingUp" color="slate" met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isCurrency={true} />
+                <KPICard title={priceKpiMode === 'preco' ? 'Preço Médio' : 'Ticket Médio'} metricKey={priceKpiMode === 'preco' ? 'precoMedioCur' : 'ticketMedioCur'} growthKey={priceKpiMode === 'preco' ? 'precoMedioGrowth' : 'ticketMedioGrowth'} icon={priceKpiMode === 'preco' ? "Package" : "MapPin"} color="blue" onClick={priceKpiMode === 'preco' ? () => openModal('preco') : null} toggle={() => setPriceKpiMode(p => p === 'preco' ? 'ticket' : 'preco')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isCurrency={true} />
+                <KPICard title="Capilaridade" metricKey="capCur" growthKey="capGrowth" icon="Users" color="slate" onClick={() => openModal('capilaridade')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+                <KPICard title="Clientes Novos" metricKey="novosMain" growthKey="fatNovosMain" icon="UserPlus" color="emerald" onClick={() => openModal('novos')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+                <KPICard title="Em Alerta" metricKey="alertaMain" icon="Bell" color="amber" onClick={() => openModal('alerta')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+                <KPICard title="Clientes Perdidos" metricKey="perdidosMain" growthKey="fatPerdidosMain" icon="UserMinus" color="rose" onClick={() => openModal('perdidos')} met={globalMetrics} yearComp={yearComparisonData} timeMode={timeMode} isNumber={true} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+                <div className="lg:col-span-2 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5"><Icon name="TrendingUp" size={12} className="text-blue-600" /> Evolução ({timeMode})</h3>
+                        <div className="flex bg-slate-100 p-0.5 rounded-md shadow-sm border border-slate-200 no-print">
+                            <button onClick={() => setEvolucaoMode('faturamento')} className={`px-2 py-1 text-[8px] font-bold rounded transition-colors ${evolucaoMode === 'faturamento' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>R$</button>
+                            <button onClick={() => setEvolucaoMode('quantidade')} className={`px-2 py-1 text-[8px] font-bold rounded transition-colors ${evolucaoMode === 'quantidade' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Unid.</button>
+                        </div>
+                    </div>
+                    <div className="h-[200px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={evolutionChartData.data} margin={{ top: 5, right: 10, left: 5, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 600, fill: '#94a3b8'}} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => formatShortNum(v)} width={45} />
+                                <Tooltip formatter={(v, name) => [evolucaoMode === 'faturamento' ? formatCurrency(v) : (Number(v || 0).toLocaleString('pt-BR') + " un"), "Ano " + String(name)]} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 6px 12px rgba(0,0,0,0.1)'}} />
+                                <Legend verticalAlign="top" height={20} iconType="circle" wrapperStyle={{ fontSize: '9px', fontWeight: 'bold', color: '#64748b' }} />
+                                {evolutionChartMedia !== null && <ReferenceLine y={evolutionChartMedia} stroke="#94a3b8" strokeDasharray="4 4" label={{ position: 'top', value: `Média: ${evolucaoMode === 'faturamento' ? formatShortNum(evolutionChartMedia) : Number(evolutionChartMedia).toFixed(0)}`, fill: '#64748b', fontSize: 8, fontWeight: 'bold' }} />}
+                                {evolutionChartData.lines.map((y, i) => {
+                                    const isNewest = y === Math.max(...evolutionChartData.lines);
+                                    const color = evolutionChartData.lines.length === 2 ? (isNewest ? '#3b82f6' : '#cbd5e1') : CHART_COLORS[i % CHART_COLORS.length];
+                                    return <Line key={String(y)} type="monotone" dataKey={y} name={String(y)} stroke={color} strokeWidth={2.5} dot={{r: 2, fill: color, strokeWidth: 1.5}} activeDot={{r: 5}} connectNulls={false} />
+                                })}
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+                <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col group print-force-bg">
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5"><Icon name="MapPin" size={12} className="text-blue-600" /> Repres. ({timeMode})</h3>
+                        <div className="flex items-center gap-1.5 no-print">
+                            <div className="flex flex-wrap gap-0.5 bg-slate-100 p-0.5 rounded-md shadow-sm border border-slate-200">
+                                {['UF', 'Distribuidor', 'Tipo Cliente', 'Unidade'].map(m => (<button key={m} onClick={() => setPieChartMetric(m)} className={`px-1.5 py-0.5 text-[7px] font-bold rounded transition-all ${pieChartMetric === m ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>{m}</button>))}
+                            </div>
+                            <button onClick={() => openModal('representatividade')} className="text-[8px] font-bold text-blue-600 bg-blue-50 px-1.5 py-1 rounded-md hover:bg-blue-100 shadow-sm border border-blue-200 flex items-center gap-1"><Icon name="List" size={10} /> Expan.</button>
+                        </div>
+                    </div>
+                    <div className="h-[200px] w-full relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <Treemap data={pieChartDataMain} dataKey="value" stroke="#fff" isAnimationActive={false} content={(props) => <CustomTreemapContentRecharts {...props} />}>
+                                <Tooltip content={(props) => <CustomUFTooltip {...props} />} />
+                            </Treemap>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+                <RankWidget title="Top Produtos" icon="Package" colorClass="text-blue-600" fillHex="#3b82f6" data={topProductsGlobal} isFat={false} onOpenModal={() => openModal('produtos')} timeMode={timeMode} yearComparison={yearComparisonData} />
+                <RankWidget title="Top Distribuidores" icon="Truck" colorClass="text-emerald-500" fillHex="#10b981" data={topDistribuidoresGlobal} isFat={true} onOpenModal={() => openModal('distribuidores')} timeMode={timeMode} yearComparison={yearComparisonData} />
+                <RankWidget title="Top Clientes" icon="Users" colorClass="text-fuchsia-500" fillHex="#f59e0b" data={topClientsGlobal} isFat={true} onOpenModal={() => openModal('top')} timeMode={timeMode} yearComparison={yearComparisonData} />
+            </div>
+            
+            <div className="bg-white p-3 lg:p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800 flex items-center gap-1.5 cursor-help border-b border-dashed border-slate-400 w-fit pb-[1px]" title="Eixo X = Crescimento (%) | Eixo Y = Faturamento (R$)."><Icon name="Target" size={12} className="text-blue-600" /> Matriz Estratégica (BCG)</h3>
+                    <div className="flex items-center gap-1.5 no-print">
+                        <div className="flex bg-slate-100 p-0.5 rounded-md shadow-sm border border-slate-200">
+                            <button onClick={() => setScatterMetric('clientes')} className={`px-2 py-1 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'clientes' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Cli.</button>
+                            <button onClick={() => setScatterMetric('produtos')} className={`px-2 py-1 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'produtos' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Prod.</button>
+                            <button onClick={() => setScatterMetric('distribuidores')} className={`px-2 py-1 text-[8px] font-bold rounded transition-colors ${scatterMetric === 'distribuidores' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}>Dist.</button>
+                        </div>
+                        <button onClick={() => openModal('matriz')} className="text-[8px] font-bold text-blue-600 bg-blue-50 px-1.5 py-1 rounded-md hover:bg-blue-100 shadow-sm border border-blue-200 flex items-center gap-1"><Icon name="List" size={10} /> Expandir</button>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 mb-2 justify-center flex-wrap no-print">
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-emerald-600 cursor-help" title="Alta Faturamento e Alto Crescimento."><div className="w-2 h-2 rounded bg-emerald-500"></div> Estrelas</div>
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-blue-600 cursor-help" title="Alta Faturamento, mas Baixo Crescimento (ou queda)."><div className="w-2 h-2 rounded bg-blue-500"></div> Vacas Leiteiras</div>
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-amber-600 cursor-help" title="Baixo Faturamento, mas Alto Crescimento."><div className="w-2 h-2 rounded bg-amber-500"></div> Apostas</div>
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-rose-600 cursor-help" title="Baixo Faturamento e Baixo Crescimento."><div className="w-2 h-2 rounded bg-rose-500"></div> Abacaxis</div>
+                </div>
+                <div className="h-[200px] w-full">
+                    {!scatterPlotData.hasHistory ? (
+                        <div className="flex items-center justify-center h-full w-full bg-slate-50 rounded-xl border border-slate-200 border-dashed"><p className="text-xs font-bold text-slate-400">Sem dados históricos suficientes para gerar a Matriz.</p></div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ScatterChart margin={{ top: 10, right: 15, bottom: 0, left: -10 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis type="number" dataKey="growth" name="Crescimento" unit="%" tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={(v) => `${v}%`} axisLine={false} tickLine={false} />
+                                <YAxis type="number" dataKey="fatCur" name="Faturamento" tick={{fontSize: 8, fontWeight: 600, fill: '#94a3b8'}} tickFormatter={v => formatShortNum(v)} axisLine={false} tickLine={false} width={40} />
+                                <ZAxis type="number" dataKey="fatCur" range={[20, 150]} />
+                                <Tooltip cursor={{strokeDasharray: '3 3'}} content={(props) => <CustomScatterTooltip {...props} />} />
+                                <ReferenceLine y={scatterPlotData.avgFat} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideTopLeft', value: 'Média Fat.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
+                                <ReferenceLine x={scatterPlotData.thresholdG} stroke="#cbd5e1" strokeDasharray="4 4" label={{ position: 'insideBottomRight', value: scatterPlotData.avgGrowth < 0 ? 'Mínimo (0%)' : 'Média Cresc.', fill: '#94a3b8', fontSize: 7, fontWeight: 'bold' }} />
+                                <Scatter name="Performance" data={scatterPlotData.filtered} fillOpacity={0.8}>{scatterPlotData.filtered.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fillHex} />)}</Scatter>
+                            </ScatterChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
+            <div className="text-center mt-0.5 pb-2 border-t border-slate-200 pt-2 no-print"><p className="text-[9px] text-slate-400 font-semibold tracking-wider">DESENVOLVIDO POR: <a href="mailto:george.gos@gmail.com" className="text-blue-500 hover:text-blue-700 font-black hover:underline transition-colors ml-0.5">GEORGE SILVA</a></p></div>
+        </div>
+    );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<DashboardApp />);
+</script>
+</body>
+</html>
